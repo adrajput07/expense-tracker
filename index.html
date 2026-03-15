@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.github.com; img-src 'self' data:; object-src 'none'; base-uri 'self';">
 <title>Expense Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
@@ -148,23 +147,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 .empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px}
 .empty b{color:var(--text);font-family:var(--font-head);font-size:16px;display:block;margin-bottom:6px}
 
-/* CONFLICT MODAL */
-#conflict-modal{display:none;position:fixed;inset:0;z-index:10000;background:rgba(10,10,15,.88);backdrop-filter:blur(6px);align-items:center;justify-content:center}
-#conflict-modal.open{display:flex}
-.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;max-width:460px;width:90%}
-.modal-box h3{font-family:var(--font-head);font-size:17px;font-weight:800;margin-bottom:8px}
-.modal-box p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:18px}
-.modal-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
-.modal-stat{background:var(--input);border-radius:8px;padding:12px}
-.modal-stat .ms-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px}
-.modal-stat .ms-val{font-family:var(--font-head);font-weight:700;font-size:15px}
-.modal-actions{display:flex;gap:8px;flex-wrap:wrap}
-.modal-actions button{flex:1;min-width:90px;border:none;border-radius:8px;padding:10px 12px;font-family:var(--font-head);font-weight:700;font-size:12px;cursor:pointer;transition:opacity .15s}
-.modal-actions button:hover{opacity:.85}
-.btn-keep-remote{background:var(--lime);color:#0a0a0f}
-.btn-keep-local{background:var(--pink);color:#fff}
-.btn-merge{background:var(--teal);color:#0a0a0f}
-.btn-cancel-modal{background:var(--input);color:var(--muted)}
+/* FORCE PUSH DANGER BUTTON */
+.btn-force{border-color:rgba(240,74,143,.4) !important;color:var(--pink) !important}
+.btn-force:hover{border-color:var(--pink) !important;background:rgba(240,74,143,.08) !important}
 </style>
 </head>
 <body>
@@ -191,10 +176,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
         <input type="password" id="s-pat" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off"/>
       </div>
       <div class="field">
-        <label>Passphrase <span style="font-size:10px;color:var(--muted)">(encrypts token in storage)</span></label>
-        <input type="password" id="s-passphrase" placeholder="Min 8 chars" autocomplete="new-password"/>
-      </div>
-      <div class="field">
         <label>Gist ID <span style="font-size:10px;color:var(--muted)">(auto-filled after first push)</span></label>
         <input type="text" id="s-gist" placeholder="Leave blank — will be created automatically"/>
       </div>
@@ -202,11 +183,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
     <div class="settings-note">
       <b>One-time setup:</b><br>
       1. Go to <a href="https://github.com/settings/tokens/new" target="_blank">github.com → Settings → Developer Settings → Personal Access Tokens → Tokens (classic)</a><br>
-      2. Give it a name like <b>expense-tracker</b>, tick only the <b>gist</b> scope<br>
-      3. ⚠ Set an <b>expiration (30 or 90 days)</b> — avoid "No expiration"<br>
-      4. Paste the token + a passphrase above → Save Settings → click <b>☁ Push to GitHub</b><br>
-      5. Your PAT is <b>AES-256 encrypted</b> before being stored — the raw token is never saved to disk<br>
-      6. On your other devices, enter the same token + passphrase + copy the Gist ID from here
+      2. Give it a name like <b>expense-tracker</b>, tick only the <b>gist</b> scope, click Generate<br>
+      3. Copy &amp; paste the token above → Save Settings → click <b>☁ Push to GitHub</b><br>
+      4. The Gist ID auto-saves. On your other devices, enter the same token + copy the Gist ID from here.
     </div>
     <div class="settings-actions">
       <button class="btn-action" onclick="saveSettings()">💾 Save Settings</button>
@@ -246,6 +225,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
   <div class="actions-row">
     <button class="btn-action btn-sync" id="btn-push" onclick="pushToGist()">☁ Push to GitHub</button>
     <button class="btn-action btn-sync" id="btn-pull" onclick="pullFromGist()">⬇ Pull from GitHub</button>
+    <button class="btn-action btn-force" id="btn-force-push" onclick="forcePushToGist()" title="Overwrite Gist with exactly what is on this device">⚠ Force Push (Fix Sync)</button>
     <button class="btn-action" onclick="exportJSON()">⬇ Export JSON</button>
     <button class="btn-action" onclick="triggerImport()">⬆ Import JSON</button>
     <button class="btn-action btn-settings" onclick="toggleSettings()">⚙ Sync Settings</button>
@@ -313,65 +293,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
   </div>
 </div>
 
-<!-- CONFLICT MODAL -->
-<div id="conflict-modal">
-  <div class="modal-box">
-    <h3>⚠ Sync Conflict</h3>
-    <p>Your local data and the GitHub Gist have different transaction counts. How do you want to resolve this?</p>
-    <div class="modal-stats">
-      <div class="modal-stat">
-        <div class="ms-label">Local Data</div>
-        <div class="ms-val" id="modal-local-count" style="color:var(--amber)">—</div>
-      </div>
-      <div class="modal-stat">
-        <div class="ms-label">Remote (Gist)</div>
-        <div class="ms-val" id="modal-remote-count" style="color:var(--teal)">—</div>
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-keep-remote" onclick="resolveConflict('remote')">Use Remote</button>
-      <button class="btn-keep-local" onclick="resolveConflict('local')">Keep Local</button>
-      <button class="btn-merge" onclick="resolveConflict('merge')">Merge Both</button>
-      <button class="btn-cancel-modal" onclick="resolveConflict('cancel')">Cancel</button>
-    </div>
-  </div>
-</div>
-
 <!-- TOAST -->
 <div id="toast"></div>
 
 <script>
-// ── XSS SANITIZER ─────────────────────────────────────────────────────────────
-function esc(str){
-  return String(str)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
-}
-
-// ── WEB CRYPTO — PAT ENCRYPTION ───────────────────────────────────────────────
-async function deriveKey(passphrase,salt){
-  const enc=new TextEncoder();
-  const base=await crypto.subtle.importKey('raw',enc.encode(passphrase),{name:'PBKDF2'},false,['deriveKey']);
-  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:200000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
-}
-async function encryptPAT(token,passphrase){
-  const enc=new TextEncoder();
-  const salt=crypto.getRandomValues(new Uint8Array(16));
-  const iv=crypto.getRandomValues(new Uint8Array(12));
-  const key=await deriveKey(passphrase,salt);
-  const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(token));
-  const b64=x=>btoa(String.fromCharCode(...new Uint8Array(x)));
-  return `${b64(salt)}.${b64(iv)}.${b64(cipher)}`;
-}
-async function decryptPAT(blob,passphrase){
-  const dec=new TextDecoder();
-  const[saltB64,ivB64,cB64]=blob.split('.');
-  const b64a=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-  const key=await deriveKey(passphrase,b64a(saltB64));
-  const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64a(ivB64)},key,b64a(cB64));
-  return dec.decode(plain);
-}
-
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const STORAGE_KEY   = 'expense_tracker_v1';
 const SETTINGS_KEY  = 'expense_tracker_settings';
@@ -385,23 +310,13 @@ const CAT_COLORS = {
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let transactions = [];
 let syncSettings  = {pat:'', gistId:''};
-let patInMemory   = ''; // holds decrypted PAT for the session only
-let conflictRemoteData = null;
 let autoSyncTimer = null;
 let isSyncing = false;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
 function loadFromStorage(){
   try{ transactions = JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); }catch(e){ transactions=[]; }
-  try{
-    const s=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}');
-    // Migrate: if old plain-text PAT exists, keep it temporarily so sync still works
-    // but flag that user should re-save with a passphrase
-    syncSettings={pat:s.pat||'',encryptedPat:s.encryptedPat||'',gistId:s.gistId||''};
-    // If we have an encryptedPat, don't use the raw one
-    if(syncSettings.encryptedPat) syncSettings.pat='';
-    patInMemory = syncSettings.pat; // backwards compat: if plain pat exists, use it for now
-  }catch(e){}
+  try{ const s=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'); syncSettings={pat:s.pat||'',gistId:s.gistId||''}; }catch(e){}
 }
 function saveToStorage(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
@@ -446,15 +361,16 @@ function setSyncStatus(state,label){
 function updateSyncUI(){
   const pushBtn=document.getElementById('btn-push');
   const pullBtn=document.getElementById('btn-pull');
-  if(!patInMemory){
+  const forceBtn=document.getElementById('btn-force-push');
+  if(!syncSettings.pat){
     setSyncStatus('','Not configured');
-    pushBtn.disabled=true; pullBtn.disabled=true;
+    pushBtn.disabled=true; pullBtn.disabled=true; forceBtn.disabled=true;
   } else if(!syncSettings.gistId){
     setSyncStatus('','Ready — push to create Gist');
-    pushBtn.disabled=false; pullBtn.disabled=true;
+    pushBtn.disabled=false; pullBtn.disabled=true; forceBtn.disabled=false;
   } else {
     setSyncStatus('ok','Gist connected');
-    pushBtn.disabled=false; pullBtn.disabled=false;
+    pushBtn.disabled=false; pullBtn.disabled=false; forceBtn.disabled=false;
   }
 }
 
@@ -463,29 +379,16 @@ function toggleSettings(){
   const p=document.getElementById('settings-panel');
   p.classList.toggle('open');
   if(p.classList.contains('open')){
-    document.getElementById('s-pat').value=''; // never pre-fill PAT
-    document.getElementById('s-passphrase').value='';
+    document.getElementById('s-pat').value=syncSettings.pat;
     document.getElementById('s-gist').value=syncSettings.gistId;
   }
 }
-async function saveSettings(){
-  const pat=document.getElementById('s-pat').value.trim();
-  const passphrase=document.getElementById('s-passphrase').value;
-  const gistId=document.getElementById('s-gist').value.trim();
-  if(!pat){ toast('Enter your GitHub PAT','err'); return; }
-  if(passphrase.length<8){ toast('Passphrase must be at least 8 characters','err'); return; }
-  try{
-    const encrypted=await encryptPAT(pat,passphrase);
-    syncSettings.encryptedPat=encrypted;
-    syncSettings.pat=''; // never store raw
-    syncSettings.gistId=gistId;
-    patInMemory=pat;
-    saveSyncSettings(); updateSyncUI();
-    document.getElementById('settings-panel').classList.remove('open');
-    toast('Settings saved — PAT encrypted with AES-256','info');
-  }catch(e){
-    toast('Encryption error: '+e.message,'err');
-  }
+function saveSettings(){
+  syncSettings.pat=document.getElementById('s-pat').value.trim();
+  syncSettings.gistId=document.getElementById('s-gist').value.trim();
+  saveSyncSettings(); updateSyncUI();
+  document.getElementById('settings-panel').classList.remove('open');
+  toast('Sync settings saved','info');
 }
 
 // ── GITHUB GIST API ───────────────────────────────────────────────────────────
@@ -493,7 +396,7 @@ async function gistRequest(method,endpoint,body){
   const res=await fetch('https://api.github.com'+endpoint,{
     method,
     headers:{
-      'Authorization':'token '+patInMemory,
+      'Authorization':'token '+syncSettings.pat,
       'Accept':'application/vnd.github.v3+json',
       'Content-Type':'application/json'
     },
@@ -504,7 +407,7 @@ async function gistRequest(method,endpoint,body){
 }
 
 async function pushToGist(){
-  if(!patInMemory){ toast('Add your GitHub token in ⚙ Sync Settings','err'); return; }
+  if(!syncSettings.pat){ toast('Add your GitHub token in ⚙ Sync Settings','err'); return; }
   if(isSyncing) return;
   isSyncing=true;
   setSyncStatus('syncing','Pushing…');
@@ -541,7 +444,7 @@ async function pushToGist(){
 }
 
 async function pullFromGist(silent=false){
-  if(!patInMemory||!syncSettings.gistId){ if(!silent) toast('Configure sync settings first','err'); return; }
+  if(!syncSettings.pat||!syncSettings.gistId){ if(!silent) toast('Configure sync settings first','err'); return; }
   if(isSyncing) return;
   isSyncing=true;
   setSyncStatus('syncing','Pulling…');
@@ -552,59 +455,35 @@ async function pullFromGist(silent=false){
     if(!file) throw new Error('Expense data file not found in this Gist');
     const data=JSON.parse(file.content);
     const remote=Array.isArray(data)?data:(data.transactions||[]);
-
-    // conflict detection: different length + local has data
-    if(transactions.length>0 && remote.length!==transactions.length){
-      conflictRemoteData=remote;
-      document.getElementById('modal-local-count').textContent=transactions.length+' transactions';
-      document.getElementById('modal-remote-count').textContent=remote.length+' transactions';
-      document.getElementById('conflict-modal').classList.add('open');
-      setSyncStatus('err','Conflict — resolve below');
-      return;
-    }
-    // no conflict — just apply
+    // Always replace local with Gist — Gist is the source of truth on pull
     transactions=remote;
     saveToStorage(); fullRefresh();
     const time=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
     setSyncStatus('ok','Pulled at '+time);
     if(!silent) toast('⬇ Pulled '+transactions.length+' transactions from GitHub','info');
-    else if(remote.length>0) toast('⬇ Auto-pulled latest data from GitHub','info');
+    else if(remote.length>0) toast('⬇ Auto-pulled latest data ('+remote.length+' transactions)','info');
   } catch(e){
     setSyncStatus('err','Pull failed');
     if(!silent) toast('Pull failed: '+e.message,'err');
     console.error(e);
   } finally {
     isSyncing=false;
-    if(!document.getElementById('conflict-modal').classList.contains('open')) updateSyncUI();
+    updateSyncUI();
     document.getElementById('btn-pull').disabled=false;
   }
 }
 
-// ── CONFLICT RESOLUTION ───────────────────────────────────────────────────────
-function resolveConflict(action){
-  document.getElementById('conflict-modal').classList.remove('open');
-  if(action==='cancel'){ updateSyncUI(); conflictRemoteData=null; return; }
-  if(action==='remote'){
-    transactions=conflictRemoteData;
-    toast('Using remote data ('+transactions.length+' transactions)','info');
-  } else if(action==='merge'){
-    const existing=new Set(transactions.map(t=>t.date+'|'+t.merchant+'|'+t.amount+'|'+t.cat));
-    const added=conflictRemoteData.filter(t=>!existing.has(t.date+'|'+t.merchant+'|'+t.amount+'|'+t.cat));
-    transactions=[...transactions,...added];
-    transactions.sort((a,b)=>b.date.localeCompare(a.date));
-    toast('Merged: '+added.length+' new transactions added','info');
-  } else {
-    toast('Kept local data ('+transactions.length+' transactions)','ok');
-  }
-  conflictRemoteData=null;
-  saveToStorage(); fullRefresh(); updateSyncUI();
-  // After resolving, push whatever we ended up with
-  if(action!=='cancel') scheduleAutoSync();
+// ── FORCE PUSH — overwrites Gist unconditionally ──────────────────────────────
+async function forcePushToGist(){
+  if(!syncSettings.pat){ toast('Add your GitHub token in ⚙ Sync Settings','err'); return; }
+  if(!confirm('Force Push will overwrite the Gist with your current '+transactions.length+' transactions.\n\nThis is irreversible. Continue?')) return;
+  await pushToGist();
+  toast('✓ Force pushed '+transactions.length+' transactions — Gist is now updated','ok');
 }
 
 // ── AUTO-SYNC (debounced, 3s after last change) ───────────────────────────────
 function scheduleAutoSync(){
-  if(!patInMemory||!syncSettings.gistId) return;
+  if(!syncSettings.pat||!syncSettings.gistId) return;
   clearTimeout(autoSyncTimer);
   setSyncStatus('syncing','Saving…');
   autoSyncTimer=setTimeout(()=>{ pushToGist(); },3000);
@@ -769,7 +648,7 @@ function renderWeekly(){
   dEl.innerHTML=[...weeks].reverse().map(wk=>{
     const txs=txByWeek[wk]||[];
     const total=txs.reduce((s,t)=>s+t.amount,0);
-    return`<div class="week-block chart-card" style="padding:14px"><div class="wk-header"><span>${weekLabel(wk)}</span><span class="wk-total">${fmt(total)}</span></div><table class="tx-table"><tbody>${txs.map(t=>`<tr><td>${esc(t.date)}</td><td>${esc(t.merchant)}</td><td><span class="badge">${esc(t.cat)}</span></td><td class="tx-amount">${fmtD(t.amount)}</td></tr>`).join('')}</tbody></table></div>`;
+    return`<div class="week-block chart-card" style="padding:14px"><div class="wk-header"><span>${weekLabel(wk)}</span><span class="wk-total">${fmt(total)}</span></div><table class="tx-table"><tbody>${txs.map(t=>`<tr><td>${t.date}</td><td>${t.merchant}</td><td><span class="badge">${t.cat}</span></td><td class="tx-amount">${fmtD(t.amount)}</td></tr>`).join('')}</tbody></table></div>`;
   }).join('');
 }
 
@@ -784,7 +663,7 @@ function renderDaily(){
   makeChart('chart-daily',{type:'bar',data:{labels:days.map(d=>parseDate(d).toLocaleDateString('en-IN',{day:'numeric',month:'short'})),datasets:[{data:days.map(d=>byDay[d]),backgroundColor:'rgba(240,168,74,.75)',borderColor:'#f0a84a',borderWidth:1,borderRadius:4}]},options:cloneOpts()});
   const tEl=document.getElementById('daily-table');
   if(!filtered.length){tEl.innerHTML='<div class="empty"><b>No transactions</b>for this month</div>';return;}
-  const rows=transactions.map((t,i)=>({...t,_idx:i})).filter(t=>monthKey(t.date)===month).map(t=>`<tr><td>${esc(t.date)}</td><td>${esc(t.merchant)}</td><td><span class="badge">${esc(t.cat)}</span></td><td class="tx-amount">${fmtD(t.amount)}</td></tr>`).join('');
+  const rows=transactions.map((t,i)=>({...t,_idx:i})).filter(t=>monthKey(t.date)===month).map(t=>`<tr><td>${t.date}</td><td>${t.merchant}</td><td><span class="badge">${t.cat}</span></td><td class="tx-amount">${fmtD(t.amount)}</td></tr>`).join('');
   tEl.innerHTML=`<table class="tx-table"><thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -800,7 +679,7 @@ function renderCategories(){
   transactions.forEach(t=>{ byM[t.merchant]=(byM[t.merchant]||0)+t.amount; });
   const topM=Object.entries(byM).sort((a,b)=>b[1]-a[1]).slice(0,10);
   const maxM=topM[0]?topM[0][1]:1;
-  document.getElementById('merchant-bars').innerHTML=topM.length?topM.map(([n,a])=>`<div class="bar-item"><div class="bar-meta"><span class="name">${esc(n)}</span><span class="amt">${fmt(a)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${(a/maxM*100).toFixed(1)}%;background:var(--teal)"></div></div></div>`).join(''):'<div class="empty"><b>No data</b></div>';
+  document.getElementById('merchant-bars').innerHTML=topM.length?topM.map(([n,a])=>`<div class="bar-item"><div class="bar-meta"><span class="name">${n}</span><span class="amt">${fmt(a)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${(a/maxM*100).toFixed(1)}%;background:var(--teal)"></div></div></div>`).join(''):'<div class="empty"><b>No data</b></div>';
   const maxC=Math.max(...CATS.map(c=>byCat[c]),1);
   document.getElementById('cat-bars').innerHTML=CATS.map(c=>`<div class="bar-item"><div class="bar-meta"><span class="name">${c}</span><span class="amt">${fmt(byCat[c])}</span></div><div class="bar-track"><div class="bar-fill" style="width:${(byCat[c]/maxC*100).toFixed(1)}%;background:${CAT_COLORS[c]}"></div></div></div>`).join('');
 }
@@ -819,7 +698,7 @@ function renderAll(){
   document.getElementById('all-count').innerHTML=`<b>${filtered.length}</b> transactions · <b>${fmt(total)}</b>`;
   const tEl=document.getElementById('all-table');
   if(!filtered.length){tEl.innerHTML='<div class="empty"><b>No transactions</b>Try different filters</div>';return;}
-  tEl.innerHTML=`<table class="tx-table"><thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th><th></th></tr></thead><tbody>${filtered.map(t=>`<tr><td>${esc(t.date)}</td><td>${esc(t.merchant)}</td><td><span class="badge">${esc(t.cat)}</span></td><td class="tx-amount">${fmtD(t.amount)}</td><td><button class="tx-del" onclick="deleteTransaction(${Number(t._idx)})">✕</button></td></tr>`).join('')}</tbody></table>`;
+  tEl.innerHTML=`<table class="tx-table"><thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th><th></th></tr></thead><tbody>${filtered.map(t=>`<tr><td>${t.date}</td><td>${t.merchant}</td><td><span class="badge">${t.cat}</span></td><td class="tx-amount">${fmtD(t.amount)}</td><td><button class="tx-del" onclick="deleteTransaction(${t._idx})">✕</button></td></tr>`).join('')}</tbody></table>`;
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
@@ -830,34 +709,9 @@ populateMonthSelect('all-month-sel',true);
 fullRefresh();
 updateSyncUI();
 
-// If encrypted PAT exists and no plain-text fallback: show inline unlock prompt
-if(syncSettings.encryptedPat && !patInMemory){
-  // Inject a small unlock banner just below the header
-  const banner=document.createElement('div');
-  banner.id='unlock-banner';
-  banner.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
-  banner.innerHTML=`<span style="font-size:12px;color:var(--muted);flex:1">🔒 Enter your sync passphrase to activate GitHub sync</span><input type="password" id="unlock-pass" placeholder="Passphrase…" style="background:var(--input);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font-body);font-size:13px;padding:8px 12px;outline:none;width:200px" /><button class="btn-action btn-sync" onclick="unlockPAT()" style="white-space:nowrap">Unlock Sync</button>`;
-  document.querySelector('.wrap').insertBefore(banner, document.getElementById('settings-panel').nextSibling);
-  document.getElementById('unlock-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') unlockPAT(); });
-} else if(patInMemory && syncSettings.gistId){
-  // Plain-text PAT still in storage (old format) — auto-pull works as before
-  pullFromGist(true);
-}
-
-async function unlockPAT(){
-  const pass=document.getElementById('unlock-pass').value;
-  if(!pass) return;
-  try{
-    patInMemory=await decryptPAT(syncSettings.encryptedPat,pass);
-    document.getElementById('unlock-banner')?.remove();
-    updateSyncUI();
-    toast('Sync unlocked','info');
-    if(syncSettings.gistId) pullFromGist(true);
-  }catch(e){
-    toast('Wrong passphrase — try again','err');
-    document.getElementById('unlock-pass').value='';
-    document.getElementById('unlock-pass').focus();
-  }
+// Auto-pull on page load if Gist is configured
+if(syncSettings.pat && syncSettings.gistId){
+  pullFromGist(true); // silent=true: no toast if already up to date
 }
 </script>
 </body>
