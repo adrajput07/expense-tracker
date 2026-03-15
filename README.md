@@ -103,4 +103,3 @@ README.md    — this file
 
 ---
 
-*Built with help from Claude (Anthropic) — spec, code, hosting, sync and deployment all done in one session.*
