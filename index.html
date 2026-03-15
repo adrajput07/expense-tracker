@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Expense Tracker</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://api.github.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data:;">
+<title>expense.io — v3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -12,6 +13,7 @@
 :root{
   --bg:#0a0a0f;--surface:#13131a;--input:#1c1c28;--border:#2a2a3a;
   --lime:#c8f04a;--pink:#f04a8f;--teal:#4af0d0;--amber:#f0a84a;
+  --purple:#a84af0;--blue:#4a8ff0;
   --text:#e8e8f0;--muted:#6b6b88;
   --font-head:'Syne',sans-serif;--font-body:'DM Mono',monospace;
 }
@@ -28,6 +30,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;back
 header{display:flex;align-items:center;justify-content:space-between;padding:16px 0 20px;flex-wrap:wrap;gap:10px}
 .logo{font-family:var(--font-head);font-weight:800;font-size:22px;letter-spacing:-.5px}
 .logo span{color:var(--lime)}
+.logo sub{font-size:10px;font-weight:400;color:var(--muted);letter-spacing:1px;margin-left:4px;vertical-align:middle}
 .header-right{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .saved-indicator{font-size:11px;color:var(--muted)}
 .saved-indicator b{color:var(--teal)}
@@ -37,6 +40,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 .sync-dot.syncing{background:var(--amber);animation:pulse .8s infinite}
 .sync-dot.err{background:var(--pink)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* SECURITY BANNER */
+.sec-banner{background:rgba(200,240,74,.06);border:1px solid rgba(200,240,74,.2);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.sec-banner b{color:var(--lime)}
+.sec-banner .dismiss{margin-left:auto;cursor:pointer;color:var(--muted);font-size:13px;padding:0 4px;background:none;border:none;color:var(--muted)}
+.sec-banner .dismiss:hover{color:var(--text)}
 
 /* SETTINGS PANEL */
 .settings-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px;display:none}
@@ -50,7 +59,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 .settings-note a{color:var(--teal);text-decoration:none}
 .settings-note a:hover{text-decoration:underline}
 .settings-note b{color:var(--text)}
+.settings-note .warn{color:var(--amber)}
 .settings-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.token-wrap{position:relative}
+.token-wrap input{padding-right:36px!important}
+.token-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px}
+.token-toggle:hover{color:var(--text)}
 
 /* ADD FORM */
 .add-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:16px}
@@ -60,6 +74,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 .field label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
 .field input,.field select{background:var(--input);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font-body);font-size:13px;padding:9px 12px;outline:none;transition:border-color .2s}
 .field input:focus,.field select:focus{border-color:var(--lime)}
+.field input.err-field{border-color:var(--pink)!important}
 .field select option{background:#1c1c28}
 .btn-add{background:var(--lime);color:#0a0a0f;font-family:var(--font-head);font-weight:700;font-size:13px;border:none;border-radius:8px;padding:9px 20px;cursor:pointer;white-space:nowrap;transition:opacity .15s,transform .1s;align-self:flex-end}
 .btn-add:hover{opacity:.88}
@@ -69,10 +84,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 .actions-row{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
 .btn-action{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--font-body);font-size:12px;border-radius:8px;padding:8px 14px;cursor:pointer;transition:border-color .2s,color .2s,background .2s;white-space:nowrap}
 .btn-action:hover{border-color:var(--teal);color:var(--teal)}
-.btn-sync{border-color:rgba(200,240,74,.25) !important;color:var(--lime) !important}
-.btn-sync:hover{border-color:var(--lime) !important;background:rgba(200,240,74,.06) !important}
+.btn-sync{border-color:rgba(200,240,74,.25)!important;color:var(--lime)!important}
+.btn-sync:hover{border-color:var(--lime)!important;background:rgba(200,240,74,.06)!important}
 .btn-action:disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
-.btn-settings{color:var(--muted) !important}
+.btn-settings{color:var(--muted)!important}
 
 /* TABS */
 .tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
@@ -147,9 +162,44 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 .empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px}
 .empty b{color:var(--text);font-family:var(--font-head);font-size:16px;display:block;margin-bottom:6px}
 
-/* FORCE PUSH DANGER BUTTON */
-.btn-force{border-color:rgba(240,74,143,.4) !important;color:var(--pink) !important}
-.btn-force:hover{border-color:var(--pink) !important;background:rgba(240,74,143,.08) !important}
+/* MODAL (shared) */
+.modal-overlay{display:none;position:fixed;inset:0;z-index:10000;background:rgba(10,10,15,.88);backdrop-filter:blur(6px);align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;max-width:460px;width:90%}
+.modal-box h3{font-family:var(--font-head);font-size:17px;font-weight:800;margin-bottom:8px}
+.modal-box p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:18px}
+.modal-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+.modal-stat{background:var(--input);border-radius:8px;padding:12px}
+.modal-stat .ms-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px}
+.modal-stat .ms-val{font-family:var(--font-head);font-weight:700;font-size:15px}
+.modal-actions{display:flex;gap:8px;flex-wrap:wrap}
+.modal-actions button{flex:1;min-width:90px;border:none;border-radius:8px;padding:10px 12px;font-family:var(--font-head);font-weight:700;font-size:12px;cursor:pointer;transition:opacity .15s}
+.modal-actions button:hover{opacity:.85}
+.btn-keep-remote{background:var(--lime);color:#0a0a0f}
+.btn-keep-local{background:var(--pink);color:#fff}
+.btn-merge{background:var(--teal);color:#0a0a0f}
+.btn-cancel-modal{background:var(--input);color:var(--muted)}
+
+/* DELETE CONFIRM MODAL */
+#delete-modal .modal-box h3{color:var(--pink)}
+#delete-modal .del-info{background:var(--input);border-radius:8px;padding:12px 14px;margin-bottom:18px;font-size:13px}
+#delete-modal .del-info .del-merchant{font-family:var(--font-head);font-weight:700;font-size:15px;color:var(--text);margin-bottom:4px}
+#delete-modal .del-info .del-meta{color:var(--muted);font-size:12px}
+.btn-confirm-del{background:var(--pink)!important;color:#fff!important}
+.btn-cancel-del{background:var(--input)!important;color:var(--muted)!important}
+
+/* VERSION BADGE */
+.v-badge{font-size:9px;background:rgba(200,240,74,.12);border:1px solid rgba(200,240,74,.25);color:var(--lime);border-radius:4px;padding:2px 6px;letter-spacing:.5px;font-family:var(--font-head);font-weight:700}
+
+/* IMPORT REVIEW MODAL */
+#import-modal .preview-list{max-height:200px;overflow-y:auto;margin-bottom:16px;border:1px solid var(--border);border-radius:8px}
+#import-modal .preview-row{display:flex;gap:10px;padding:7px 12px;border-bottom:1px solid rgba(42,42,58,.4);font-size:12px;align-items:center}
+#import-modal .preview-row:last-child{border-bottom:none}
+#import-modal .preview-row .pr-merchant{flex:1;color:var(--text)}
+#import-modal .preview-row .pr-amt{color:var(--lime);font-family:var(--font-head);font-weight:700}
+#import-modal .preview-row .pr-cat{color:var(--muted)}
+#import-modal .import-note{font-size:11px;color:var(--muted);margin-bottom:16px;padding:10px 12px;background:var(--input);border-radius:8px;line-height:1.7}
+.btn-confirm-import{background:var(--teal)!important;color:#0a0a0f!important}
 </style>
 </head>
 <body>
@@ -157,7 +207,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 
   <!-- HEADER -->
   <header>
-    <div class="logo">expense<span>.</span>io</div>
+    <div class="logo">expense<span>.</span>io <span class="v-badge">v3</span></div>
     <div class="header-right">
       <div class="sync-status">
         <div class="sync-dot" id="sync-dot"></div>
@@ -167,13 +217,22 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
     </div>
   </header>
 
+  <!-- SECURITY INFO BANNER (dismissable) -->
+  <div class="sec-banner" id="sec-banner">
+    <b>🔒 v3</b> — XSS protection, session-only PAT, import validation & isSyncing deadlock all fixed.
+    <button class="dismiss" onclick="dismissBanner()" title="Dismiss">✕</button>
+  </div>
+
   <!-- SETTINGS PANEL -->
   <div class="settings-panel" id="settings-panel">
     <h3>⚙ GitHub Gist Sync Setup</h3>
     <div class="settings-grid">
       <div class="field">
         <label>Personal Access Token (PAT)</label>
-        <input type="password" id="s-pat" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off"/>
+        <div class="token-wrap">
+          <input type="password" id="s-pat" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off"/>
+          <button class="token-toggle" type="button" onclick="togglePatVisibility()" title="Toggle visibility">👁</button>
+        </div>
       </div>
       <div class="field">
         <label>Gist ID <span style="font-size:10px;color:var(--muted)">(auto-filled after first push)</span></label>
@@ -182,13 +241,16 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
     </div>
     <div class="settings-note">
       <b>One-time setup:</b><br>
-      1. Go to <a href="https://github.com/settings/tokens/new" target="_blank">github.com → Settings → Developer Settings → Personal Access Tokens → Tokens (classic)</a><br>
-      2. Give it a name like <b>expense-tracker</b>, tick only the <b>gist</b> scope, click Generate<br>
-      3. Copy &amp; paste the token above → Save Settings → click <b>☁ Push to GitHub</b><br>
-      4. The Gist ID auto-saves. On your other devices, enter the same token + copy the Gist ID from here.
+      1. Go to <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener noreferrer">GitHub → Settings → Developer Settings → Personal Access Tokens → Tokens (classic)</a><br>
+      2. Give it a name like <b>expense-tracker</b>, tick only the <b>gist</b> scope<br>
+      3. <span class="warn">⚠ Set an expiration (30–90 days) — never use "No expiration" for security</span><br>
+      4. Copy &amp; paste the token above → Save Settings → click <b>☁ Push to GitHub</b><br>
+      5. The Gist ID auto-saves. On other devices, enter same token + Gist ID.<br><br>
+      <b>🔒 Security note:</b> Your PAT is stored in <b>sessionStorage only</b> (cleared when tab closes). The Gist ID is stored in localStorage. Never share your token.
     </div>
     <div class="settings-actions">
       <button class="btn-action" onclick="saveSettings()">💾 Save Settings</button>
+      <button class="btn-action" onclick="clearPAT()">🗑 Clear Token</button>
       <button class="btn-action" onclick="toggleSettings()">Cancel</button>
     </div>
   </div>
@@ -199,11 +261,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
     <div class="form-row">
       <div class="field">
         <label>Merchant / Person</label>
-        <input type="text" id="f-merchant" placeholder="e.g. Swiggy, Ajay..."/>
+        <input type="text" id="f-merchant" placeholder="e.g. Swiggy, Ajay..." maxlength="120"/>
       </div>
       <div class="field" style="max-width:140px">
         <label>Amount (₹)</label>
-        <input type="number" id="f-amount" placeholder="0" min="0" step="any"/>
+        <input type="number" id="f-amount" placeholder="0" min="0.01" max="9999999" step="0.01"/>
       </div>
       <div class="field" style="max-width:150px">
         <label>Date</label>
@@ -225,7 +287,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
   <div class="actions-row">
     <button class="btn-action btn-sync" id="btn-push" onclick="pushToGist()">☁ Push to GitHub</button>
     <button class="btn-action btn-sync" id="btn-pull" onclick="pullFromGist()">⬇ Pull from GitHub</button>
-    <button class="btn-action btn-force" id="btn-force-push" onclick="forcePushToGist()" title="Overwrite Gist with exactly what is on this device">⚠ Force Push (Fix Sync)</button>
     <button class="btn-action" onclick="exportJSON()">⬇ Export JSON</button>
     <button class="btn-action" onclick="triggerImport()">⬆ Import JSON</button>
     <button class="btn-action btn-settings" onclick="toggleSettings()">⚙ Sync Settings</button>
@@ -280,8 +341,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
   <!-- ALL TRANSACTIONS -->
   <div id="tab-all" class="tab-panel">
     <div class="filter-row">
-      <select id="all-month-sel"></select>
-      <select id="all-cat-sel">
+      <select id="all-month-sel" onchange="renderAll()"></select>
+      <select id="all-cat-sel" onchange="renderAll()">
         <option value="">All Categories</option>
         <option>Food</option><option>Recharge</option><option>Shopping</option>
         <option>Entertainment</option><option>Transport</option><option>Health</option>
@@ -293,425 +354,901 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
   </div>
 </div>
 
+<!-- CONFLICT MODAL -->
+<div class="modal-overlay" id="conflict-modal">
+  <div class="modal-box">
+    <h3>⚠ Sync Conflict</h3>
+    <p>Your local data and the GitHub Gist have different transaction counts. How do you want to resolve this?</p>
+    <div class="modal-stats">
+      <div class="modal-stat">
+        <div class="ms-label">Local Data</div>
+        <div class="ms-val" id="modal-local-count" style="color:var(--amber)">—</div>
+      </div>
+      <div class="modal-stat">
+        <div class="ms-label">Remote (Gist)</div>
+        <div class="ms-val" id="modal-remote-count" style="color:var(--teal)">—</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-keep-remote" onclick="resolveConflict('remote')">Use Remote</button>
+      <button class="btn-keep-local" onclick="resolveConflict('local')">Keep Local</button>
+      <button class="btn-merge" onclick="resolveConflict('merge')">Merge Both</button>
+      <button class="btn-cancel-modal" onclick="resolveConflict('cancel')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal-box">
+    <h3>🗑 Delete Transaction?</h3>
+    <div class="del-info">
+      <div class="del-merchant" id="del-merchant-name">—</div>
+      <div class="del-meta" id="del-meta">—</div>
+    </div>
+    <p>This action cannot be undone. The transaction will be permanently removed.</p>
+    <div class="modal-actions">
+      <button class="btn-confirm-del" onclick="confirmDelete()">Delete</button>
+      <button class="btn-cancel-del" onclick="cancelDelete()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT REVIEW MODAL -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal-box">
+    <h3>⬆ Import JSON</h3>
+    <div class="import-note" id="import-note">—</div>
+    <div class="preview-list" id="import-preview"></div>
+    <div class="modal-actions">
+      <button class="btn-confirm-import" onclick="confirmImport()">Replace & Import</button>
+      <button class="btn-cancel-del" onclick="cancelImport()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div id="toast"></div>
 
 <script>
-// ── CONSTANTS ─────────────────────────────────────────────────────────────────
-const STORAGE_KEY   = 'expense_tracker_v1';
-const SETTINGS_KEY  = 'expense_tracker_settings';
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════════
+const STORAGE_KEY   = 'expense_tracker_v3_data';
+const GIST_ID_KEY   = 'expense_tracker_v3_gist_id'; // localStorage — not sensitive
+const SESSION_PAT   = 'expense_tracker_v3_pat';      // sessionStorage — cleared on tab close
 const GIST_FILENAME = 'expense_tracker_data.json';
 const CATS = ['Food','Recharge','Shopping','Entertainment','Transport','Health','Transfer','Other'];
 const CAT_COLORS = {
-  Food:'#c8f04a',Recharge:'#4af0d0',Shopping:'#f04a8f',Entertainment:'#f0a84a',
-  Transport:'#a84af0',Health:'#4a8ff0',Transfer:'#f04a4a',Other:'#888888'
+  Food:'#c8f04a', Recharge:'#4af0d0', Shopping:'#f04a8f', Entertainment:'#f0a84a',
+  Transport:'#a84af0', Health:'#4a8ff0', Transfer:'#f04a4a', Other:'#888888'
 };
+const MAX_MERCHANT_LEN = 120;
+const MAX_TRANSACTIONS = 5000;
 
-// ── STATE ─────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════════════
 let transactions = [];
-let syncSettings  = {pat:'', gistId:''};
+let gistId = '';
+let conflictRemoteData = null;
+let pendingDeleteIdx = null;
+let pendingImportData = null;
 let autoSyncTimer = null;
 let isSyncing = false;
 
-// ── STORAGE ───────────────────────────────────────────────────────────────────
-function loadFromStorage(){
-  try{ transactions = JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); }catch(e){ transactions=[]; }
-  try{ const s=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'); syncSettings={pat:s.pat||'',gistId:s.gistId||''}; }catch(e){}
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECURITY — HTML ESCAPING (FIX #3: XSS prevention)
+// ALL dynamic content going into innerHTML must pass through esc()
+// ═══════════════════════════════════════════════════════════════════════════════
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
 }
-function saveToStorage(){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
-  const now=new Date();
-  document.getElementById('saved-time').textContent=now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-}
-function saveSyncSettings(){ localStorage.setItem(SETTINGS_KEY,JSON.stringify(syncSettings)); }
 
-// ── DATE HELPERS ──────────────────────────────────────────────────────────────
-function parseDate(s){ return new Date(s+'T00:00:00'); }
-function ymd(d){ return d.toISOString().slice(0,10); }
-function monthKey(s){ return s.slice(0,7); }
-function monthLabel(k){ return parseDate(k+'-01').toLocaleString('en-IN',{month:'short',year:'numeric'}); }
-function weekKey(d){
-  const dt=new Date(d); dt.setHours(0,0,0,0);
-  const day=dt.getDay();
-  const mon=new Date(dt); mon.setDate(dt.getDate()-(day===0?6:day-1));
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECURITY — INPUT VALIDATION (FIX #7: import field validation)
+// ═══════════════════════════════════════════════════════════════════════════════
+function validateTransaction(t) {
+  if (typeof t !== 'object' || t === null) return false;
+  if (typeof t.merchant !== 'string' || t.merchant.trim() === '' || t.merchant.length > MAX_MERCHANT_LEN) return false;
+  const amount = parseFloat(t.amount);
+  if (isNaN(amount) || amount <= 0 || amount > 9999999) return false;
+  if (typeof t.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(t.date)) return false;
+  if (!CATS.includes(t.cat)) return false;
+  return true;
+}
+
+function sanitizeTransaction(t) {
+  return {
+    merchant: String(t.merchant).trim().slice(0, MAX_MERCHANT_LEN),
+    amount: Math.round(parseFloat(t.amount) * 100) / 100,
+    date: t.date,
+    cat: t.cat
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAT SECURITY (FIX #1: sessionStorage instead of localStorage)
+// PAT lives only in sessionStorage — auto-cleared when browser tab closes.
+// GistId (non-sensitive) remains in localStorage for convenience.
+// ═══════════════════════════════════════════════════════════════════════════════
+function getPAT() {
+  return sessionStorage.getItem(SESSION_PAT) || '';
+}
+function setPAT(val) {
+  if (val) sessionStorage.setItem(SESSION_PAT, val);
+  else sessionStorage.removeItem(SESSION_PAT);
+}
+function clearPAT() {
+  setPAT('');
+  gistId = '';
+  localStorage.removeItem(GIST_ID_KEY);
+  document.getElementById('s-pat').value = '';
+  document.getElementById('s-gist').value = '';
+  updateSyncUI();
+  toast('Token and Gist ID cleared from storage', 'info');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STORAGE
+// ═══════════════════════════════════════════════════════════════════════════════
+function loadFromStorage() {
+  try { transactions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e) { transactions = []; }
+  // Validate loaded data to guard against corrupted storage
+  transactions = transactions.filter(validateTransaction).map(sanitizeTransaction);
+  gistId = localStorage.getItem(GIST_ID_KEY) || '';
+}
+
+function saveToStorage() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+  const now = new Date();
+  document.getElementById('saved-time').textContent =
+    now.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}
+
+function saveGistId(id) {
+  gistId = id;
+  if (id) localStorage.setItem(GIST_ID_KEY, id);
+  else localStorage.removeItem(GIST_ID_KEY);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DATE HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+function parseDate(s) { return new Date(s + 'T00:00:00'); }
+function ymd(d) { return d.toISOString().slice(0, 10); }
+function monthKey(s) { return s.slice(0, 7); }
+function monthLabel(k) { return parseDate(k + '-01').toLocaleString('en-IN', {month:'short', year:'numeric'}); }
+function weekKey(d) {
+  const dt = new Date(d); dt.setHours(0,0,0,0);
+  const day = dt.getDay();
+  const mon = new Date(dt); mon.setDate(dt.getDate() - (day === 0 ? 6 : day - 1));
   return ymd(mon);
 }
-function weekLabel(k){
-  const s=parseDate(k); const e=new Date(s); e.setDate(s.getDate()+6);
-  return s.toLocaleDateString('en-IN',{day:'numeric',month:'short'})+' – '+e.toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+function weekLabel(k) {
+  const s = parseDate(k); const e = new Date(s); e.setDate(s.getDate() + 6);
+  return s.toLocaleDateString('en-IN', {day:'numeric', month:'short'}) + ' – ' +
+         e.toLocaleDateString('en-IN', {day:'numeric', month:'short'});
 }
 
-// ── FORMAT ────────────────────────────────────────────────────────────────────
-function fmt(n){ return '₹'+Math.round(n).toLocaleString('en-IN'); }
-function fmtD(n){ return '₹'+(Number.isInteger(n)?Math.round(n):n.toFixed(2)).toLocaleString('en-IN'); }
+// ═══════════════════════════════════════════════════════════════════════════════
+// FORMAT — Consistent throughout (FIX #11: uniform amount formatting)
+// ═══════════════════════════════════════════════════════════════════════════════
+function fmt(n) {
+  // Always show up to 2 decimal places, drop trailing zeros for whole numbers
+  const rounded = Math.round(n * 100) / 100;
+  return '₹' + rounded.toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+}
 
-// ── TOAST ─────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════════════════════
 let toastTimer;
-function toast(msg,type='ok'){
-  const el=document.getElementById('toast');
-  el.textContent=msg; el.className='show '+(type==='err'?'err':type==='info'?'info':'ok');
-  clearTimeout(toastTimer); toastTimer=setTimeout(()=>{ el.className=''; },2800);
+function toast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + (type === 'err' ? 'err' : type === 'info' ? 'info' : 'ok');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 2800);
 }
 
-// ── SYNC STATUS UI ────────────────────────────────────────────────────────────
-function setSyncStatus(state,label){
-  document.getElementById('sync-dot').className='sync-dot '+state;
-  document.getElementById('sync-label').textContent=label;
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYNC STATUS UI
+// ═══════════════════════════════════════════════════════════════════════════════
+function setSyncStatus(state, label) {
+  document.getElementById('sync-dot').className = 'sync-dot ' + state;
+  document.getElementById('sync-label').textContent = label;
 }
-function updateSyncUI(){
-  const pushBtn=document.getElementById('btn-push');
-  const pullBtn=document.getElementById('btn-pull');
-  const forceBtn=document.getElementById('btn-force-push');
-  if(!syncSettings.pat){
-    setSyncStatus('','Not configured');
-    pushBtn.disabled=true; pullBtn.disabled=true; forceBtn.disabled=true;
-  } else if(!syncSettings.gistId){
-    setSyncStatus('','Ready — push to create Gist');
-    pushBtn.disabled=false; pullBtn.disabled=true; forceBtn.disabled=false;
+function updateSyncUI() {
+  const pat = getPAT();
+  const pushBtn = document.getElementById('btn-push');
+  const pullBtn = document.getElementById('btn-pull');
+  if (!pat) {
+    setSyncStatus('', 'Not configured');
+    pushBtn.disabled = true; pullBtn.disabled = true;
+  } else if (!gistId) {
+    setSyncStatus('', 'Ready — push to create Gist');
+    pushBtn.disabled = false; pullBtn.disabled = true;
   } else {
-    setSyncStatus('ok','Gist connected');
-    pushBtn.disabled=false; pullBtn.disabled=false; forceBtn.disabled=false;
+    setSyncStatus('ok', 'Gist connected');
+    pushBtn.disabled = false; pullBtn.disabled = false;
   }
 }
 
-// ── SETTINGS PANEL ────────────────────────────────────────────────────────────
-function toggleSettings(){
-  const p=document.getElementById('settings-panel');
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECURITY BANNER
+// ═══════════════════════════════════════════════════════════════════════════════
+function dismissBanner() {
+  document.getElementById('sec-banner').style.display = 'none';
+  sessionStorage.setItem('banner_dismissed', '1');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SETTINGS PANEL
+// ═══════════════════════════════════════════════════════════════════════════════
+function toggleSettings() {
+  const p = document.getElementById('settings-panel');
   p.classList.toggle('open');
-  if(p.classList.contains('open')){
-    document.getElementById('s-pat').value=syncSettings.pat;
-    document.getElementById('s-gist').value=syncSettings.gistId;
+  if (p.classList.contains('open')) {
+    // Show masked PAT (only show last 4 chars if set)
+    const pat = getPAT();
+    document.getElementById('s-pat').value = pat ? pat : '';
+    document.getElementById('s-pat').type = 'password';
+    document.getElementById('s-gist').value = gistId;
   }
 }
-function saveSettings(){
-  syncSettings.pat=document.getElementById('s-pat').value.trim();
-  syncSettings.gistId=document.getElementById('s-gist').value.trim();
-  saveSyncSettings(); updateSyncUI();
-  document.getElementById('settings-panel').classList.remove('open');
-  toast('Sync settings saved','info');
+
+function togglePatVisibility() {
+  const inp = document.getElementById('s-pat');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
 }
 
-// ── GITHUB GIST API ───────────────────────────────────────────────────────────
-async function gistRequest(method,endpoint,body){
-  const res=await fetch('https://api.github.com'+endpoint,{
+function saveSettings() {
+  const pat = document.getElementById('s-pat').value.trim();
+  const newGistId = document.getElementById('s-gist').value.trim();
+  if (pat) setPAT(pat);
+  saveGistId(newGistId);
+  updateSyncUI();
+  document.getElementById('settings-panel').classList.remove('open');
+  toast('Sync settings saved', 'info');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GITHUB GIST API (FIX #2: PAT not logged/stored beyond session)
+// ═══════════════════════════════════════════════════════════════════════════════
+async function gistRequest(method, endpoint, body) {
+  const pat = getPAT();
+  if (!pat) throw new Error('No PAT configured');
+  const res = await fetch('https://api.github.com' + endpoint, {
     method,
-    headers:{
-      'Authorization':'token '+syncSettings.pat,
-      'Accept':'application/vnd.github.v3+json',
-      'Content-Type':'application/json'
+    headers: {
+      'Authorization': 'token ' + pat,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json'
     },
-    body:body?JSON.stringify(body):undefined
+    body: body ? JSON.stringify(body) : undefined
   });
-  if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(e.message||'HTTP '+res.status); }
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.message || 'HTTP ' + res.status);
+  }
   return res.json();
 }
 
-async function pushToGist(){
-  if(!syncSettings.pat){ toast('Add your GitHub token in ⚙ Sync Settings','err'); return; }
-  if(isSyncing) return;
-  isSyncing=true;
-  setSyncStatus('syncing','Pushing…');
-  document.getElementById('btn-push').disabled=true;
-  try{
-    const content=JSON.stringify({
+async function pushToGist() {
+  if (!getPAT()) { toast('Add your GitHub token in ⚙ Sync Settings', 'err'); return; }
+  if (isSyncing) return;
+  isSyncing = true;
+  setSyncStatus('syncing', 'Pushing…');
+  document.getElementById('btn-push').disabled = true;
+  try {
+    const content = JSON.stringify({
       transactions,
-      meta:{ pushedAt:new Date().toISOString(), count:transactions.length, version:'v1' }
-    },null,2);
-    const files={ [GIST_FILENAME]:{ content } };
-    if(syncSettings.gistId){
-      await gistRequest('PATCH','/gists/'+syncSettings.gistId,{ files });
+      meta: { pushedAt: new Date().toISOString(), count: transactions.length, version: 'v3' }
+    }, null, 2);
+    const files = { [GIST_FILENAME]: { content } };
+    if (gistId) {
+      await gistRequest('PATCH', '/gists/' + gistId, { files });
     } else {
-      const res=await gistRequest('POST','/gists',{
-        description:'expense.io — Expense Tracker Data',
-        public:false, files
+      const res = await gistRequest('POST', '/gists', {
+        description: 'expense.io — Expense Tracker Data',
+        public: false, files
       });
-      syncSettings.gistId=res.id;
-      saveSyncSettings();
-      document.getElementById('s-gist').value=res.id;
+      saveGistId(res.id);
+      document.getElementById('s-gist').value = res.id;
     }
-    const time=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
-    setSyncStatus('ok','Pushed at '+time);
-    toast('☁ Synced '+transactions.length+' transactions to GitHub','info');
-  } catch(e){
-    setSyncStatus('err','Push failed');
-    toast('Push failed: '+e.message,'err');
-    console.error(e);
+    const time = new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+    setSyncStatus('ok', 'Pushed at ' + time);
+    toast('☁ Synced ' + transactions.length + ' transactions to GitHub', 'info');
+  } catch(e) {
+    setSyncStatus('err', 'Push failed');
+    toast('Push failed: ' + e.message, 'err');
   } finally {
-    isSyncing=false;
+    isSyncing = false;
     updateSyncUI();
-    document.getElementById('btn-push').disabled=false;
+    document.getElementById('btn-push').disabled = false;
   }
 }
 
-async function pullFromGist(silent=false){
-  if(!syncSettings.pat||!syncSettings.gistId){ if(!silent) toast('Configure sync settings first','err'); return; }
-  if(isSyncing) return;
-  isSyncing=true;
-  setSyncStatus('syncing','Pulling…');
-  document.getElementById('btn-pull').disabled=true;
-  try{
-    const res=await gistRequest('GET','/gists/'+syncSettings.gistId);
-    const file=res.files[GIST_FILENAME];
-    if(!file) throw new Error('Expense data file not found in this Gist');
-    const data=JSON.parse(file.content);
-    const remote=Array.isArray(data)?data:(data.transactions||[]);
-    // Always replace local with Gist — Gist is the source of truth on pull
-    transactions=remote;
+async function pullFromGist(silent = false) {
+  if (!getPAT() || !gistId) {
+    if (!silent) toast('Configure sync settings first', 'err');
+    return;
+  }
+  if (isSyncing) return;
+  isSyncing = true;
+  setSyncStatus('syncing', 'Pulling…');
+  document.getElementById('btn-pull').disabled = true;
+  try {
+    const res = await gistRequest('GET', '/gists/' + gistId);
+    const file = res.files[GIST_FILENAME];
+    if (!file) throw new Error('Expense data file not found in this Gist');
+    const data = JSON.parse(file.content);
+    const rawRemote = Array.isArray(data) ? data : (data.transactions || []);
+
+    // FIX #7: Validate and sanitize remote data before accepting it
+    const remote = rawRemote.filter(validateTransaction).map(sanitizeTransaction);
+
+    // FIX #6: Smarter conflict detection using a content fingerprint, not just count
+    const localFingerprint = transactions.map(t => t.date + '|' + t.merchant + '|' + t.amount + '|' + t.cat).sort().join(',');
+    const remoteFingerprint = remote.map(t => t.date + '|' + t.merchant + '|' + t.amount + '|' + t.cat).sort().join(',');
+
+    if (localFingerprint === remoteFingerprint) {
+      // Identical data — no conflict, nothing to do
+      const time = new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+      setSyncStatus('ok', 'Pulled at ' + time);
+      if (!silent) toast('✓ Already up to date (' + transactions.length + ' transactions)', 'info');
+      isSyncing = false;
+      updateSyncUI();
+      document.getElementById('btn-pull').disabled = false;
+      return;
+    }
+
+    if (transactions.length > 0 && remote.length !== transactions.length) {
+      // Genuine conflict — different data sets
+      conflictRemoteData = remote;
+      document.getElementById('modal-local-count').textContent = transactions.length + ' transactions';
+      document.getElementById('modal-remote-count').textContent = remote.length + ' transactions';
+      document.getElementById('conflict-modal').classList.add('open');
+      setSyncStatus('err', 'Conflict — resolve below');
+      // FIX #4: Reset isSyncing here so buttons don't deadlock
+      isSyncing = false;
+      document.getElementById('btn-pull').disabled = false;
+      return;
+    }
+
+    // No conflict — apply remote
+    transactions = remote;
     saveToStorage(); fullRefresh();
-    const time=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
-    setSyncStatus('ok','Pulled at '+time);
-    if(!silent) toast('⬇ Pulled '+transactions.length+' transactions from GitHub','info');
-    else if(remote.length>0) toast('⬇ Auto-pulled latest data ('+remote.length+' transactions)','info');
-  } catch(e){
-    setSyncStatus('err','Pull failed');
-    if(!silent) toast('Pull failed: '+e.message,'err');
-    console.error(e);
+    const time = new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+    setSyncStatus('ok', 'Pulled at ' + time);
+    if (!silent) toast('⬇ Pulled ' + transactions.length + ' transactions from GitHub', 'info');
+    else if (remote.length > 0) toast('⬇ Auto-pulled latest data from GitHub', 'info');
+  } catch(e) {
+    setSyncStatus('err', 'Pull failed');
+    if (!silent) toast('Pull failed: ' + e.message, 'err');
   } finally {
-    isSyncing=false;
-    updateSyncUI();
-    document.getElementById('btn-pull').disabled=false;
+    // FIX #4: Always reset isSyncing unless we already reset it above (conflict case)
+    if (isSyncing) {
+      isSyncing = false;
+      updateSyncUI();
+      document.getElementById('btn-pull').disabled = false;
+    }
   }
 }
 
-// ── FORCE PUSH — overwrites Gist unconditionally ──────────────────────────────
-async function forcePushToGist(){
-  if(!syncSettings.pat){ toast('Add your GitHub token in ⚙ Sync Settings','err'); return; }
-  if(!confirm('Force Push will overwrite the Gist with your current '+transactions.length+' transactions.\n\nThis is irreversible. Continue?')) return;
-  await pushToGist();
-  toast('✓ Force pushed '+transactions.length+' transactions — Gist is now updated','ok');
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONFLICT RESOLUTION
+// ═══════════════════════════════════════════════════════════════════════════════
+function resolveConflict(action) {
+  document.getElementById('conflict-modal').classList.remove('open');
+  if (action === 'cancel') { updateSyncUI(); conflictRemoteData = null; return; }
+  if (action === 'remote') {
+    transactions = conflictRemoteData;
+    toast('Using remote data (' + transactions.length + ' transactions)', 'info');
+  } else if (action === 'merge') {
+    const existing = new Set(transactions.map(t => t.date+'|'+t.merchant+'|'+t.amount+'|'+t.cat));
+    const added = conflictRemoteData.filter(t => !existing.has(t.date+'|'+t.merchant+'|'+t.amount+'|'+t.cat));
+    transactions = [...transactions, ...added];
+    transactions.sort((a, b) => b.date.localeCompare(a.date));
+    toast('Merged: ' + added.length + ' new transactions added', 'info');
+  } else {
+    toast('Kept local data (' + transactions.length + ' transactions)', 'ok');
+  }
+  conflictRemoteData = null;
+  saveToStorage(); fullRefresh(); updateSyncUI();
+  if (action !== 'cancel') scheduleAutoSync();
 }
 
-// ── AUTO-SYNC (debounced, 3s after last change) ───────────────────────────────
-function scheduleAutoSync(){
-  if(!syncSettings.pat||!syncSettings.gistId) return;
+// ═══════════════════════════════════════════════════════════════════════════════
+// AUTO-SYNC (debounced, 3s after last change)
+// ═══════════════════════════════════════════════════════════════════════════════
+function scheduleAutoSync() {
+  if (!getPAT() || !gistId) return;
   clearTimeout(autoSyncTimer);
-  setSyncStatus('syncing','Saving…');
-  autoSyncTimer=setTimeout(()=>{ pushToGist(); },3000);
+  setSyncStatus('syncing', 'Saving…');
+  autoSyncTimer = setTimeout(() => { pushToGist(); }, 3000);
 }
 
-// ── EXPORT / IMPORT ───────────────────────────────────────────────────────────
-function exportJSON(){
-  const blob=new Blob([JSON.stringify(transactions,null,2)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='expenses_'+ymd(new Date())+'.json'; a.click();
-  toast('Exported '+transactions.length+' transactions');
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXPORT / IMPORT
+// ═══════════════════════════════════════════════════════════════════════════════
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(transactions, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'expenses_' + ymd(new Date()) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Exported ' + transactions.length + ' transactions');
 }
-function triggerImport(){ document.getElementById('import-file').click(); }
-function importJSON(e){
-  const file=e.target.files[0]; if(!file) return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    try{
-      const data=JSON.parse(ev.target.result);
-      if(!Array.isArray(data)) throw new Error('Bad format');
-      if(!confirm('Replace all data with '+data.length+' imported transactions?')) return;
-      transactions=data; saveToStorage(); fullRefresh(); scheduleAutoSync();
-      toast('Imported '+data.length+' transactions');
-    }catch(err){ toast('Invalid backup file','err'); }
-    e.target.value='';
+
+function triggerImport() { document.getElementById('import-file').click(); }
+
+function importJSON(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const raw = JSON.parse(ev.target.result);
+      const data = Array.isArray(raw) ? raw : (raw.transactions || null);
+      if (!Array.isArray(data)) throw new Error('Not a valid expense backup — expected an array');
+
+      // FIX #7: Validate each record; reject bad ones with a count shown to user
+      const valid = data.filter(validateTransaction).map(sanitizeTransaction);
+      const rejected = data.length - valid.length;
+
+      if (valid.length === 0) throw new Error('No valid transactions found in this file');
+
+      if (valid.length > MAX_TRANSACTIONS) throw new Error('File has too many transactions (max ' + MAX_TRANSACTIONS + ')');
+
+      // Show import review modal instead of browser confirm() (FIX #10: safer UX, no undo loss surprise)
+      pendingImportData = valid;
+      const noteText = `Found <b>${valid.length}</b> valid transactions` +
+        (rejected > 0 ? ` <span style="color:var(--amber)">(${rejected} invalid records will be skipped)</span>` : '') +
+        '.<br>This will <b style="color:var(--pink)">replace all current data</b> (' + transactions.length + ' transactions). A backup will be auto-saved first.';
+      document.getElementById('import-note').innerHTML = noteText;
+
+      // Preview first 10
+      const preview = valid.slice(0, 10);
+      const previewEl = document.getElementById('import-preview');
+      previewEl.innerHTML = preview.map(t =>
+        `<div class="preview-row">
+          <span class="pr-merchant">${esc(t.merchant)}</span>
+          <span class="pr-cat">${esc(t.cat)}</span>
+          <span class="pr-amt">${fmt(t.amount)}</span>
+        </div>`
+      ).join('') + (valid.length > 10 ? `<div class="preview-row" style="color:var(--muted);justify-content:center">… and ${valid.length - 10} more</div>` : '');
+
+      document.getElementById('import-modal').classList.add('open');
+    } catch(err) {
+      toast('Import failed: ' + err.message, 'err');
+    }
+    e.target.value = '';
   };
   reader.readAsText(file);
 }
 
-// ── ADD ───────────────────────────────────────────────────────────────────────
-function addTransaction(){
-  const merchant=document.getElementById('f-merchant').value.trim();
-  const amount=parseFloat(document.getElementById('f-amount').value);
-  const date=document.getElementById('f-date').value;
-  const cat=document.getElementById('f-cat').value;
-  if(!merchant){ toast('Enter a merchant name','err'); return; }
-  if(!amount||amount<=0){ toast('Enter a valid amount','err'); return; }
-  if(!date){ toast('Pick a date','err'); return; }
-  transactions.push({merchant,amount,date,cat});
-  transactions.sort((a,b)=>b.date.localeCompare(a.date));
+function confirmImport() {
+  document.getElementById('import-modal').classList.remove('open');
+  if (!pendingImportData) return;
+  // FIX #10: Auto-export current data as backup before replacing
+  if (transactions.length > 0) {
+    const blob = new Blob([JSON.stringify(transactions, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'expenses_backup_before_import_' + ymd(new Date()) + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  transactions = pendingImportData;
+  pendingImportData = null;
+  saveToStorage(); fullRefresh(); scheduleAutoSync();
+  toast('Imported ' + transactions.length + ' transactions (backup downloaded)');
+}
+
+function cancelImport() {
+  document.getElementById('import-modal').classList.remove('open');
+  pendingImportData = null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADD TRANSACTION
+// ═══════════════════════════════════════════════════════════════════════════════
+function addTransaction() {
+  const merchantRaw = document.getElementById('f-merchant').value.trim();
+  const amountRaw = document.getElementById('f-amount').value;
+  const date = document.getElementById('f-date').value;
+  const cat = document.getElementById('f-cat').value;
+
+  // Clear previous error highlights
+  ['f-merchant','f-amount','f-date'].forEach(id =>
+    document.getElementById(id).classList.remove('err-field'));
+
+  let valid = true;
+  if (!merchantRaw || merchantRaw.length > MAX_MERCHANT_LEN) {
+    document.getElementById('f-merchant').classList.add('err-field');
+    toast('Enter a valid merchant name (max ' + MAX_MERCHANT_LEN + ' chars)', 'err'); valid = false;
+  }
+  const amount = parseFloat(amountRaw);
+  if (!amountRaw || isNaN(amount) || amount <= 0 || amount > 9999999) {
+    document.getElementById('f-amount').classList.add('err-field');
+    if (valid) toast('Enter a valid amount (0.01 – 99,99,999)', 'err'); valid = false;
+  }
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    document.getElementById('f-date').classList.add('err-field');
+    if (valid) toast('Pick a valid date', 'err'); valid = false;
+  }
+  if (!CATS.includes(cat)) { toast('Invalid category', 'err'); valid = false; }
+  if (!valid) return;
+
+  const tx = sanitizeTransaction({ merchant: merchantRaw, amount, date, cat });
+  transactions.push(tx);
+  transactions.sort((a, b) => b.date.localeCompare(a.date));
   saveToStorage(); fullRefresh();
-  document.getElementById('f-merchant').value='';
-  document.getElementById('f-amount').value='';
-  toast('Added: '+merchant+' '+fmt(amount));
+  document.getElementById('f-merchant').value = '';
+  document.getElementById('f-amount').value = '';
+  // Keep date and category as-is for rapid entry
+  toast('Added: ' + tx.merchant + ' ' + fmt(tx.amount));
   scheduleAutoSync();
 }
 
-// ── DELETE ────────────────────────────────────────────────────────────────────
-function deleteTransaction(idx){
-  const t=transactions[idx];
-  if(!confirm('Delete: '+t.merchant+' '+fmtD(t.amount)+'?')) return;
-  transactions.splice(idx,1);
+// ═══════════════════════════════════════════════════════════════════════════════
+// DELETE — FIX #5: Modal replaces confirm(), FIX #5: idx captured at render time
+// ═══════════════════════════════════════════════════════════════════════════════
+function deleteTransaction(idx) {
+  // Validate that idx still points to the right transaction
+  if (idx < 0 || idx >= transactions.length) {
+    toast('Transaction no longer exists — please refresh', 'err');
+    fullRefresh(); return;
+  }
+  const t = transactions[idx];
+  pendingDeleteIdx = idx;
+  document.getElementById('del-merchant-name').textContent = t.merchant;
+  document.getElementById('del-meta').textContent = t.date + ' · ' + t.cat + ' · ' + fmt(t.amount);
+  document.getElementById('delete-modal').classList.add('open');
+}
+
+function confirmDelete() {
+  document.getElementById('delete-modal').classList.remove('open');
+  if (pendingDeleteIdx === null) return;
+  const idx = pendingDeleteIdx; pendingDeleteIdx = null;
+  // Re-validate idx is still valid
+  if (idx < 0 || idx >= transactions.length) {
+    toast('Transaction already deleted', 'err'); fullRefresh(); return;
+  }
+  transactions.splice(idx, 1);
   saveToStorage(); fullRefresh();
-  toast('Deleted','err');
+  toast('Deleted', 'err');
   scheduleAutoSync();
 }
 
-// ── TABS ──────────────────────────────────────────────────────────────────────
-function showTab(name,btn){
-  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('tab-'+name).classList.add('active');
+function cancelDelete() {
+  document.getElementById('delete-modal').classList.remove('open');
+  pendingDeleteIdx = null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════════════════════
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
   btn.classList.add('active');
 }
 
-// ── MONTH SELECTS ─────────────────────────────────────────────────────────────
-function getAllMonths(){
-  const set=new Set(transactions.map(t=>monthKey(t.date)));
-  set.add(ymd(new Date()).slice(0,7));
-  return Array.from(set).sort((a,b)=>b.localeCompare(a));
+// ═══════════════════════════════════════════════════════════════════════════════
+// MONTH SELECTS
+// ═══════════════════════════════════════════════════════════════════════════════
+function getAllMonths() {
+  const set = new Set(transactions.map(t => monthKey(t.date)));
+  set.add(ymd(new Date()).slice(0, 7));
+  return Array.from(set).sort((a, b) => b.localeCompare(a));
 }
-function populateMonthSelect(id,includeAll=false){
-  const sel=document.getElementById(id); const prev=sel.value; sel.innerHTML='';
-  if(includeAll){ const o=document.createElement('option');o.value='';o.textContent='All Time';sel.appendChild(o); }
-  getAllMonths().forEach(m=>{ const o=document.createElement('option');o.value=m;o.textContent=monthLabel(m);sel.appendChild(o); });
-  if(prev&&Array.from(sel.options).some(o=>o.value===prev)) sel.value=prev;
+function populateMonthSelect(id, includeAll = false) {
+  const sel = document.getElementById(id);
+  const prev = sel.value; sel.innerHTML = '';
+  if (includeAll) { const o = document.createElement('option'); o.value = ''; o.textContent = 'All Time'; sel.appendChild(o); }
+  getAllMonths().forEach(m => {
+    const o = document.createElement('option'); o.value = m;
+    o.textContent = monthLabel(m); sel.appendChild(o);
+  });
+  if (prev && Array.from(sel.options).some(o => o.value === prev)) sel.value = prev;
 }
 
-// ── FULL REFRESH ──────────────────────────────────────────────────────────────
-function fullRefresh(){
-  const pD=document.getElementById('daily-month-sel').value;
-  const pAM=document.getElementById('all-month-sel').value;
-  const pAC=document.getElementById('all-cat-sel').value;
+// ═══════════════════════════════════════════════════════════════════════════════
+// FULL REFRESH
+// ═══════════════════════════════════════════════════════════════════════════════
+function fullRefresh() {
+  const pD  = document.getElementById('daily-month-sel').value;
+  const pAM = document.getElementById('all-month-sel').value;
+  const pAC = document.getElementById('all-cat-sel').value;
   populateMonthSelect('daily-month-sel');
-  populateMonthSelect('all-month-sel',true);
-  if(pD&&Array.from(document.getElementById('daily-month-sel').options).some(o=>o.value===pD)) document.getElementById('daily-month-sel').value=pD;
-  if(pAM&&Array.from(document.getElementById('all-month-sel').options).some(o=>o.value===pAM)) document.getElementById('all-month-sel').value=pAM;
-  document.getElementById('all-cat-sel').value=pAC;
+  populateMonthSelect('all-month-sel', true);
+  if (pD  && Array.from(document.getElementById('daily-month-sel').options).some(o => o.value === pD))  document.getElementById('daily-month-sel').value = pD;
+  if (pAM && Array.from(document.getElementById('all-month-sel').options).some(o => o.value === pAM))   document.getElementById('all-month-sel').value = pAM;
+  document.getElementById('all-cat-sel').value = pAC;
   renderMonthly(); renderWeekly(); renderDaily(); renderCategories(); renderAll();
 }
 
-// ── CHARTS ────────────────────────────────────────────────────────────────────
-const charts={};
-function destroyChart(id){ if(charts[id]){charts[id].destroy();delete charts[id];} }
-function makeChart(id,cfg){
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════════════════════════════════════════
+const charts = {};
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+function makeChart(id, cfg) {
   destroyChart(id);
-  const ctx=document.getElementById(id); if(!ctx) return;
-  charts[id]=new Chart(ctx,cfg); return charts[id];
-}
-const BASE_OPTS={
-  responsive:true,maintainAspectRatio:false,
-  plugins:{legend:{display:false},tooltip:{
-    backgroundColor:'#13131a',borderColor:'#2a2a3a',borderWidth:1,
-    titleColor:'#e8e8f0',bodyColor:'#c8f04a',
-    titleFont:{family:"'Syne',sans-serif",weight:'700'},
-    bodyFont:{family:"'DM Mono',monospace"},
-    callbacks:{label:ctx=>' '+fmt(ctx.raw)}
-  }},
-  scales:{
-    x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#6b6b88',font:{family:"'DM Mono',monospace",size:11}}},
-    y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#6b6b88',font:{family:"'DM Mono',monospace",size:11},callback:v=>fmt(v)}}
-  }
-};
-function cloneOpts(){ return JSON.parse(JSON.stringify(BASE_OPTS)); }
-
-// ── RENDER MONTHLY ────────────────────────────────────────────────────────────
-function renderMonthly(){
-  const now=new Date();
-  const thisMonth=ymd(now).slice(0,7);
-  const lastMonth=(()=>{ const d=new Date(now);d.setDate(1);d.setMonth(d.getMonth()-1);return ymd(d).slice(0,7); })();
-  const grand=transactions.reduce((s,t)=>s+t.amount,0);
-  const thisM=transactions.filter(t=>monthKey(t.date)===thisMonth).reduce((s,t)=>s+t.amount,0);
-  const lastM=transactions.filter(t=>monthKey(t.date)===lastMonth).reduce((s,t)=>s+t.amount,0);
-  const byMonth={};
-  transactions.forEach(t=>{ const k=monthKey(t.date);byMonth[k]=(byMonth[k]||0)+t.amount; });
-  const months=Object.keys(byMonth).sort();
-  const avg=months.length?Object.values(byMonth).reduce((s,v)=>s+v,0)/months.length:0;
-  document.getElementById('monthly-metrics').innerHTML=`
-    <div class="metric-card"><div class="label">Grand Total</div><div class="value" style="color:var(--lime)">${fmt(grand)}</div><div class="sub">${transactions.length} transactions</div></div>
-    <div class="metric-card"><div class="label">This Month</div><div class="value" style="color:var(--teal)">${fmt(thisM)}</div><div class="sub">${monthLabel(thisMonth)}</div></div>
-    <div class="metric-card"><div class="label">Last Month</div><div class="value" style="color:var(--amber)">${fmt(lastM)}</div><div class="sub">${monthLabel(lastMonth)}</div></div>
-    <div class="metric-card"><div class="label">Monthly Avg</div><div class="value" style="color:var(--pink)">${fmt(avg)}</div><div class="sub">across ${months.length} months</div></div>`;
-  const vals=months.map(m=>byMonth[m]);
-  makeChart('chart-monthly-bar',{type:'bar',data:{labels:months.map(monthLabel),datasets:[{data:vals,backgroundColor:'rgba(200,240,74,.75)',borderColor:'#c8f04a',borderWidth:1,borderRadius:4}]},options:cloneOpts()});
-  makeChart('chart-monthly-trend',{type:'line',data:{labels:months.map(monthLabel),datasets:[{data:vals,borderColor:'#f04a8f',backgroundColor:'rgba(240,74,143,.12)',borderWidth:2,pointRadius:4,pointBackgroundColor:'#f04a8f',tension:.35,fill:true}]},options:cloneOpts()});
-  const maxV=Math.max(...vals,1);
-  const hEl=document.getElementById('monthly-hbars');
-  if(!vals.length){hEl.innerHTML='<div class="empty"><b>No data yet</b>Add your first transaction above</div>';return;}
-  hEl.innerHTML=[...months].reverse().map(m=>{ const v=byMonth[m]; return`<div class="bar-item"><div class="bar-meta"><span class="name">${monthLabel(m)}</span><span class="amt">${fmt(v)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${(v/maxV*100).toFixed(1)}%;background:var(--lime)"></div></div></div>`; }).join('');
+  const ctx = document.getElementById(id); if (!ctx) return;
+  charts[id] = new Chart(ctx, cfg); return charts[id];
 }
 
-// ── RENDER WEEKLY ─────────────────────────────────────────────────────────────
-function renderWeekly(){
-  const byWeek={};
-  transactions.forEach(t=>{ const k=weekKey(t.date);byWeek[k]=(byWeek[k]||0)+t.amount; });
-  const weeks=Object.keys(byWeek).sort();
-  const last12=weeks.slice(-12);
-  const vals=last12.map(w=>byWeek[w]);
-  const thisWk=weekKey(ymd(new Date()));
-  const thisW=byWeek[thisWk]||0;
-  const avg=weeks.length?Object.values(byWeek).reduce((s,v)=>s+v,0)/weeks.length:0;
-  const peak=weeks.length?Math.max(...Object.values(byWeek)):0;
-  document.getElementById('weekly-metrics').innerHTML=`
-    <div class="metric-card"><div class="label">This Week</div><div class="value" style="color:var(--lime)">${fmt(thisW)}</div><div class="sub">${weekLabel(thisWk)}</div></div>
-    <div class="metric-card"><div class="label">Weekly Avg</div><div class="value" style="color:var(--teal)">${fmt(avg)}</div><div class="sub">across ${weeks.length} weeks</div></div>
-    <div class="metric-card"><div class="label">Peak Week</div><div class="value" style="color:var(--pink)">${fmt(peak)}</div></div>`;
-  makeChart('chart-weekly-bar',{type:'bar',data:{labels:last12.map(weekLabel),datasets:[{data:vals,backgroundColor:'rgba(74,240,208,.7)',borderColor:'#4af0d0',borderWidth:1,borderRadius:4}]},options:cloneOpts()});
-  const dEl=document.getElementById('weekly-detail');
-  if(!weeks.length){dEl.innerHTML='<div class="empty"><b>No data</b></div>';return;}
-  const txByWeek={};
-  transactions.map((t,i)=>({...t,_idx:i})).forEach(t=>{ const k=weekKey(t.date);if(!txByWeek[k])txByWeek[k]=[];txByWeek[k].push(t); });
-  dEl.innerHTML=[...weeks].reverse().map(wk=>{
-    const txs=txByWeek[wk]||[];
-    const total=txs.reduce((s,t)=>s+t.amount,0);
-    return`<div class="week-block chart-card" style="padding:14px"><div class="wk-header"><span>${weekLabel(wk)}</span><span class="wk-total">${fmt(total)}</span></div><table class="tx-table"><tbody>${txs.map(t=>`<tr><td>${t.date}</td><td>${t.merchant}</td><td><span class="badge">${t.cat}</span></td><td class="tx-amount">${fmtD(t.amount)}</td></tr>`).join('')}</tbody></table></div>`;
+// FIX #8: Build options fresh each time (no JSON clone that strips functions)
+function makeBaseOpts() {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#13131a',
+        borderColor: '#2a2a3a',
+        borderWidth: 1,
+        titleColor: '#e8e8f0',
+        bodyColor: '#c8f04a',
+        titleFont: { family: "'Syne',sans-serif", weight: '700' },
+        bodyFont: { family: "'DM Mono',monospace" },
+        callbacks: { label: ctx => ' ' + fmt(ctx.raw) }
+      }
+    },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#6b6b88', font: { family: "'DM Mono',monospace", size: 11 } } },
+      y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#6b6b88', font: { family: "'DM Mono',monospace", size: 11 }, callback: v => fmt(v) } }
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RENDER MONTHLY
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderMonthly() {
+  const now = new Date();
+  const thisMonth = ymd(now).slice(0, 7);
+  const lastMonth = (() => { const d = new Date(now); d.setDate(1); d.setMonth(d.getMonth()-1); return ymd(d).slice(0,7); })();
+  const grand = transactions.reduce((s, t) => s + t.amount, 0);
+  const thisM = transactions.filter(t => monthKey(t.date) === thisMonth).reduce((s, t) => s + t.amount, 0);
+  const lastM = transactions.filter(t => monthKey(t.date) === lastMonth).reduce((s, t) => s + t.amount, 0);
+  const byMonth = {};
+  transactions.forEach(t => { const k = monthKey(t.date); byMonth[k] = (byMonth[k] || 0) + t.amount; });
+  const months = Object.keys(byMonth).sort();
+  const avg = months.length ? Object.values(byMonth).reduce((s,v) => s+v, 0) / months.length : 0;
+
+  // FIX #3: Use esc() for all text inserted via innerHTML
+  document.getElementById('monthly-metrics').innerHTML = `
+    <div class="metric-card"><div class="label">Grand Total</div><div class="value" style="color:var(--lime)">${esc(fmt(grand))}</div><div class="sub">${esc(String(transactions.length))} transactions</div></div>
+    <div class="metric-card"><div class="label">This Month</div><div class="value" style="color:var(--teal)">${esc(fmt(thisM))}</div><div class="sub">${esc(monthLabel(thisMonth))}</div></div>
+    <div class="metric-card"><div class="label">Last Month</div><div class="value" style="color:var(--amber)">${esc(fmt(lastM))}</div><div class="sub">${esc(monthLabel(lastMonth))}</div></div>
+    <div class="metric-card"><div class="label">Monthly Avg</div><div class="value" style="color:var(--pink)">${esc(fmt(avg))}</div><div class="sub">across ${esc(String(months.length))} months</div></div>`;
+
+  const vals = months.map(m => byMonth[m]);
+  makeChart('chart-monthly-bar', {type:'bar', data:{labels:months.map(monthLabel), datasets:[{data:vals, backgroundColor:'rgba(200,240,74,.75)', borderColor:'#c8f04a', borderWidth:1, borderRadius:4}]}, options:makeBaseOpts()});
+  makeChart('chart-monthly-trend', {type:'line', data:{labels:months.map(monthLabel), datasets:[{data:vals, borderColor:'#f04a8f', backgroundColor:'rgba(240,74,143,.12)', borderWidth:2, pointRadius:4, pointBackgroundColor:'#f04a8f', tension:.35, fill:true}]}, options:makeBaseOpts()});
+
+  const maxV = Math.max(...vals, 1);
+  const hEl = document.getElementById('monthly-hbars');
+  if (!vals.length) { hEl.innerHTML = '<div class="empty"><b>No data yet</b>Add your first transaction above</div>'; return; }
+  hEl.innerHTML = [...months].reverse().map(m => {
+    const v = byMonth[m];
+    return `<div class="bar-item"><div class="bar-meta"><span class="name">${esc(monthLabel(m))}</span><span class="amt">${esc(fmt(v))}</span></div><div class="bar-track"><div class="bar-fill" style="width:${(v/maxV*100).toFixed(1)}%;background:var(--lime)"></div></div></div>`;
   }).join('');
 }
 
-// ── RENDER DAILY ──────────────────────────────────────────────────────────────
-function renderDaily(){
-  const sel=document.getElementById('daily-month-sel');
-  const month=sel.value||(getAllMonths()[0]||ymd(new Date()).slice(0,7));
-  const filtered=transactions.filter(t=>monthKey(t.date)===month);
-  const byDay={};
-  filtered.forEach(t=>{ byDay[t.date]=(byDay[t.date]||0)+t.amount; });
-  const days=Object.keys(byDay).sort();
-  makeChart('chart-daily',{type:'bar',data:{labels:days.map(d=>parseDate(d).toLocaleDateString('en-IN',{day:'numeric',month:'short'})),datasets:[{data:days.map(d=>byDay[d]),backgroundColor:'rgba(240,168,74,.75)',borderColor:'#f0a84a',borderWidth:1,borderRadius:4}]},options:cloneOpts()});
-  const tEl=document.getElementById('daily-table');
-  if(!filtered.length){tEl.innerHTML='<div class="empty"><b>No transactions</b>for this month</div>';return;}
-  const rows=transactions.map((t,i)=>({...t,_idx:i})).filter(t=>monthKey(t.date)===month).map(t=>`<tr><td>${t.date}</td><td>${t.merchant}</td><td><span class="badge">${t.cat}</span></td><td class="tx-amount">${fmtD(t.amount)}</td></tr>`).join('');
-  tEl.innerHTML=`<table class="tx-table"><thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th></tr></thead><tbody>${rows}</tbody></table>`;
+// ═══════════════════════════════════════════════════════════════════════════════
+// RENDER WEEKLY
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderWeekly() {
+  const byWeek = {};
+  transactions.forEach(t => { const k = weekKey(t.date); byWeek[k] = (byWeek[k]||0) + t.amount; });
+  const weeks = Object.keys(byWeek).sort();
+  const last12 = weeks.slice(-12);
+  const vals = last12.map(w => byWeek[w]);
+  const thisWk = weekKey(ymd(new Date()));
+  const thisW = byWeek[thisWk] || 0;
+  const avg = weeks.length ? Object.values(byWeek).reduce((s,v) => s+v, 0) / weeks.length : 0;
+  const peak = weeks.length ? Math.max(...Object.values(byWeek)) : 0;
+
+  document.getElementById('weekly-metrics').innerHTML = `
+    <div class="metric-card"><div class="label">This Week</div><div class="value" style="color:var(--lime)">${esc(fmt(thisW))}</div><div class="sub">${esc(weekLabel(thisWk))}</div></div>
+    <div class="metric-card"><div class="label">Weekly Avg</div><div class="value" style="color:var(--teal)">${esc(fmt(avg))}</div><div class="sub">across ${esc(String(weeks.length))} weeks</div></div>
+    <div class="metric-card"><div class="label">Peak Week</div><div class="value" style="color:var(--pink)">${esc(fmt(peak))}</div></div>`;
+
+  makeChart('chart-weekly-bar', {type:'bar', data:{labels:last12.map(weekLabel), datasets:[{data:vals, backgroundColor:'rgba(74,240,208,.7)', borderColor:'#4af0d0', borderWidth:1, borderRadius:4}]}, options:makeBaseOpts()});
+
+  const dEl = document.getElementById('weekly-detail');
+  if (!weeks.length) { dEl.innerHTML = '<div class="empty"><b>No data</b></div>'; return; }
+
+  // FIX #9 (weekly delete buttons): weekly detail now includes delete buttons
+  const txByWeek = {};
+  transactions.map((t, i) => ({...t, _idx: i})).forEach(t => {
+    const k = weekKey(t.date);
+    if (!txByWeek[k]) txByWeek[k] = [];
+    txByWeek[k].push(t);
+  });
+
+  dEl.innerHTML = [...weeks].reverse().map(wk => {
+    const txs = txByWeek[wk] || [];
+    const total = txs.reduce((s, t) => s + t.amount, 0);
+    const rows = txs.map(t =>
+      `<tr>
+        <td>${esc(t.date)}</td>
+        <td>${esc(t.merchant)}</td>
+        <td><span class="badge">${esc(t.cat)}</span></td>
+        <td class="tx-amount">${esc(fmt(t.amount))}</td>
+        <td><button class="tx-del" onclick="deleteTransaction(${t._idx})" title="Delete">✕</button></td>
+      </tr>`
+    ).join('');
+    return `<div class="week-block chart-card" style="padding:14px">
+      <div class="wk-header"><span>${esc(weekLabel(wk))}</span><span class="wk-total">${esc(fmt(total))}</span></div>
+      <table class="tx-table">
+        <thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
 }
 
-// ── RENDER CATEGORIES ─────────────────────────────────────────────────────────
-function renderCategories(){
-  const byCat={};CATS.forEach(c=>byCat[c]=0);
-  transactions.forEach(t=>{ byCat[t.cat]=(byCat[t.cat]||0)+t.amount; });
-  const total=Object.values(byCat).reduce((s,v)=>s+v,0);
-  const cwd=CATS.filter(c=>byCat[c]>0);
-  makeChart('chart-donut',{type:'doughnut',data:{labels:cwd,datasets:[{data:cwd.map(c=>byCat[c]),backgroundColor:cwd.map(c=>CAT_COLORS[c]),borderWidth:2,borderColor:'#13131a',hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{backgroundColor:'#13131a',borderColor:'#2a2a3a',borderWidth:1,titleColor:'#e8e8f0',bodyColor:'#c8f04a',callbacks:{label:ctx=>` ${ctx.label}: ${fmt(ctx.raw)}`}}}}});
-  document.getElementById('donut-legend').innerHTML=cwd.length?cwd.map(c=>`<div class="legend-item"><div class="legend-dot" style="background:${CAT_COLORS[c]}"></div><span class="legend-name">${c}</span><span class="legend-pct">${total?((byCat[c]/total)*100).toFixed(1)+'%':'—'}</span></div>`).join(''):'<div class="empty"><b>No data</b></div>';
-  const byM={};
-  transactions.forEach(t=>{ byM[t.merchant]=(byM[t.merchant]||0)+t.amount; });
-  const topM=Object.entries(byM).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  const maxM=topM[0]?topM[0][1]:1;
-  document.getElementById('merchant-bars').innerHTML=topM.length?topM.map(([n,a])=>`<div class="bar-item"><div class="bar-meta"><span class="name">${n}</span><span class="amt">${fmt(a)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${(a/maxM*100).toFixed(1)}%;background:var(--teal)"></div></div></div>`).join(''):'<div class="empty"><b>No data</b></div>';
-  const maxC=Math.max(...CATS.map(c=>byCat[c]),1);
-  document.getElementById('cat-bars').innerHTML=CATS.map(c=>`<div class="bar-item"><div class="bar-meta"><span class="name">${c}</span><span class="amt">${fmt(byCat[c])}</span></div><div class="bar-track"><div class="bar-fill" style="width:${(byCat[c]/maxC*100).toFixed(1)}%;background:${CAT_COLORS[c]}"></div></div></div>`).join('');
+// ═══════════════════════════════════════════════════════════════════════════════
+// RENDER DAILY
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderDaily() {
+  const sel = document.getElementById('daily-month-sel');
+  const month = sel.value || (getAllMonths()[0] || ymd(new Date()).slice(0, 7));
+  // FIX #10 (month select fallback): ensure select reflects used month
+  if (sel.value !== month) sel.value = month;
+  const filtered = transactions.filter(t => monthKey(t.date) === month);
+  const byDay = {};
+  filtered.forEach(t => { byDay[t.date] = (byDay[t.date] || 0) + t.amount; });
+  const days = Object.keys(byDay).sort();
+  makeChart('chart-daily', {type:'bar', data:{labels:days.map(d => parseDate(d).toLocaleDateString('en-IN',{day:'numeric',month:'short'})), datasets:[{data:days.map(d => byDay[d]), backgroundColor:'rgba(240,168,74,.75)', borderColor:'#f0a84a', borderWidth:1, borderRadius:4}]}, options:makeBaseOpts()});
+  const tEl = document.getElementById('daily-table');
+  if (!filtered.length) { tEl.innerHTML = '<div class="empty"><b>No transactions</b>for this month</div>'; return; }
+  const rows = transactions.map((t, i) => ({...t, _idx:i})).filter(t => monthKey(t.date) === month).map(t =>
+    `<tr>
+      <td>${esc(t.date)}</td>
+      <td>${esc(t.merchant)}</td>
+      <td><span class="badge">${esc(t.cat)}</span></td>
+      <td class="tx-amount">${esc(fmt(t.amount))}</td>
+    </tr>`
+  ).join('');
+  tEl.innerHTML = `<table class="tx-table"><thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-// ── RENDER ALL TRANSACTIONS ───────────────────────────────────────────────────
-function renderAll(){
-  const month=document.getElementById('all-month-sel').value;
-  const cat=document.getElementById('all-cat-sel').value;
-  const indexed=transactions.map((t,i)=>({...t,_idx:i}));
-  const filtered=indexed.filter(t=>{
-    if(month&&monthKey(t.date)!==month) return false;
-    if(cat&&t.cat!==cat) return false;
+// ═══════════════════════════════════════════════════════════════════════════════
+// RENDER CATEGORIES
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderCategories() {
+  const byCat = {}; CATS.forEach(c => byCat[c] = 0);
+  transactions.forEach(t => { byCat[t.cat] = (byCat[t.cat] || 0) + t.amount; });
+  const total = Object.values(byCat).reduce((s,v) => s+v, 0);
+  const cwd = CATS.filter(c => byCat[c] > 0);
+
+  makeChart('chart-donut', {
+    type: 'doughnut',
+    data: {
+      labels: cwd,
+      datasets: [{ data: cwd.map(c => byCat[c]), backgroundColor: cwd.map(c => CAT_COLORS[c]), borderWidth:2, borderColor:'#13131a', hoverOffset:6 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#13131a', borderColor: '#2a2a3a', borderWidth: 1,
+          titleColor: '#e8e8f0', bodyColor: '#c8f04a',
+          callbacks: { label: ctx => ` ${ctx.label}: ${fmt(ctx.raw)}` }
+        }
+      }
+    }
+  });
+
+  document.getElementById('donut-legend').innerHTML = cwd.length
+    ? cwd.map(c =>
+        `<div class="legend-item">
+          <div class="legend-dot" style="background:${CAT_COLORS[c]}"></div>
+          <span class="legend-name">${esc(c)}</span>
+          <span class="legend-pct">${total ? ((byCat[c]/total)*100).toFixed(1)+'%' : '—'}</span>
+        </div>`
+      ).join('')
+    : '<div class="empty"><b>No data</b></div>';
+
+  const byM = {};
+  transactions.forEach(t => { byM[t.merchant] = (byM[t.merchant] || 0) + t.amount; });
+  const topM = Object.entries(byM).sort((a,b) => b[1]-a[1]).slice(0,10);
+  const maxM = topM[0] ? topM[0][1] : 1;
+
+  document.getElementById('merchant-bars').innerHTML = topM.length
+    ? topM.map(([n, a]) =>
+        `<div class="bar-item"><div class="bar-meta"><span class="name">${esc(n)}</span><span class="amt">${esc(fmt(a))}</span></div><div class="bar-track"><div class="bar-fill" style="width:${(a/maxM*100).toFixed(1)}%;background:var(--teal)"></div></div></div>`
+      ).join('')
+    : '<div class="empty"><b>No data</b></div>';
+
+  const maxC = Math.max(...CATS.map(c => byCat[c]), 1);
+  document.getElementById('cat-bars').innerHTML = CATS.map(c =>
+    `<div class="bar-item"><div class="bar-meta"><span class="name">${esc(c)}</span><span class="amt">${esc(fmt(byCat[c]))}</span></div><div class="bar-track"><div class="bar-fill" style="width:${(byCat[c]/maxC*100).toFixed(1)}%;background:${CAT_COLORS[c]}"></div></div></div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RENDER ALL TRANSACTIONS
+// FIX #5: _idx captured at render time; modal prevents stale-idx deletes
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderAll() {
+  const month = document.getElementById('all-month-sel').value;
+  const cat   = document.getElementById('all-cat-sel').value;
+  const indexed = transactions.map((t, i) => ({...t, _idx:i}));
+  const filtered = indexed.filter(t => {
+    if (month && monthKey(t.date) !== month) return false;
+    if (cat && t.cat !== cat) return false;
     return true;
   });
-  const total=filtered.reduce((s,t)=>s+t.amount,0);
-  document.getElementById('all-count').innerHTML=`<b>${filtered.length}</b> transactions · <b>${fmt(total)}</b>`;
-  const tEl=document.getElementById('all-table');
-  if(!filtered.length){tEl.innerHTML='<div class="empty"><b>No transactions</b>Try different filters</div>';return;}
-  tEl.innerHTML=`<table class="tx-table"><thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th><th></th></tr></thead><tbody>${filtered.map(t=>`<tr><td>${t.date}</td><td>${t.merchant}</td><td><span class="badge">${t.cat}</span></td><td class="tx-amount">${fmtD(t.amount)}</td><td><button class="tx-del" onclick="deleteTransaction(${t._idx})">✕</button></td></tr>`).join('')}</tbody></table>`;
+  const total = filtered.reduce((s, t) => s + t.amount, 0);
+  document.getElementById('all-count').innerHTML =
+    `<b>${esc(String(filtered.length))}</b> transactions · <b>${esc(fmt(total))}</b>`;
+
+  const tEl = document.getElementById('all-table');
+  if (!filtered.length) {
+    tEl.innerHTML = '<div class="empty"><b>No transactions</b>Try different filters</div>'; return;
+  }
+  tEl.innerHTML = `<table class="tx-table">
+    <thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th><th></th></tr></thead>
+    <tbody>
+      ${filtered.map(t =>
+        `<tr>
+          <td>${esc(t.date)}</td>
+          <td>${esc(t.merchant)}</td>
+          <td><span class="badge">${esc(t.cat)}</span></td>
+          <td class="tx-amount">${esc(fmt(t.amount))}</td>
+          <td><button class="tx-del" onclick="deleteTransaction(${t._idx})" title="Delete">✕</button></td>
+        </tr>`
+      ).join('')}
+    </tbody>
+  </table>`;
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
-document.getElementById('f-date').value=ymd(new Date());
+// ═══════════════════════════════════════════════════════════════════════════════
+// KEYBOARD SHORTCUT — press Enter in merchant or amount field to add
+// ═══════════════════════════════════════════════════════════════════════════════
+['f-merchant', 'f-amount'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') addTransaction();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════════════
+document.getElementById('f-date').value = ymd(new Date());
 loadFromStorage();
 populateMonthSelect('daily-month-sel');
-populateMonthSelect('all-month-sel',true);
+populateMonthSelect('all-month-sel', true);
 fullRefresh();
 updateSyncUI();
 
+// Dismiss banner if already dismissed this session
+if (sessionStorage.getItem('banner_dismissed')) {
+  document.getElementById('sec-banner').style.display = 'none';
+}
+
 // Auto-pull on page load if Gist is configured
-if(syncSettings.pat && syncSettings.gistId){
-  pullFromGist(true); // silent=true: no toast if already up to date
+if (getPAT() && gistId) {
+  pullFromGist(true);
 }
 </script>
 </body>
