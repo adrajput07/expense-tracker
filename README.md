@@ -1,175 +1,156 @@
-# expense.io — Personal Expense Tracker `v3`
+# expense.io
 
-A fully offline-capable, single HTML file personal expense tracker with GitHub Gist cloud sync. No server, no backend, no subscription. Just open the URL and use it.
-
-> **v3** is a security-hardened rewrite. If you're on v1 or v2, see the [migration note](#migrating-from-v1--v2) below.
-
----
-
-## Tech Stack
-
-- Single `index.html` file — no framework, no build step
-- Chart.js 4.4.1 (from CDN) for all charts
-- Google Fonts — Syne (headings) + DM Mono (numbers/body)
-- `localStorage` for transaction data persistence
-- `sessionStorage` for PAT (cleared automatically on tab close)
-- GitHub Pages for free hosting
-- GitHub Gist API for private cloud sync
-
----
+A single-file personal expense tracker with GitHub Gist sync, offline-first storage, and multi-tab conflict resolution. No backend, no build step, no dependencies to install — open the HTML file and it works.
 
 ## Features
 
-- Add transactions with merchant, amount, date, and category
-- 8 categories: Food, Recharge, Shopping, Entertainment, Transport, Health, Transfer, Other
-- Delete any transaction with confirmation modal (no accidental deletes)
-- 5 tabs: Monthly, Weekly, Daily, Categories, All Transactions
-- Charts: bar, line, donut — all dark themed, responsive
-- Export data as JSON backup
-- Import JSON backup with preview modal + auto-backup before replacing
-- GitHub Gist sync — push and pull data across all devices
-- Auto-sync: every add/delete triggers a push to Gist after 3 seconds
-- Auto-pull on page load — always starts with latest data
-- Conflict resolution modal — merge, use remote, or keep local
-- Toast notifications for every action
-- Dark theme with lime / pink / teal / amber accents
-- Enter key submits the add form from any field
+- **Add & delete transactions** — merchant, amount (₹), date, category
+- **5 analytics views** — Monthly, Weekly, Daily, Categories, All Transactions
+- **Charts** — bar, line, doughnut (Chart.js 4.4.1, inlined)
+- **GitHub Gist sync** — push/pull across devices using a Personal Access Token
+- **Auto-sync** — debounced 3-second push after every add/delete, with tab-close guard
+- **Conflict resolution modal** — content-fingerprint detection with merge, keep-local, or use-remote options
+- **JSON export / import** — with pre-import backup download and record-level validation
+- **Offline-first** — all data in `localStorage`; Gist sync is optional
+- **Up to 5,000 transactions**, max ₹99,99,999 per entry
 
----
+## Quick Start
 
-## Security (v3)
+1. Download `expense_tracker_v4.html`
+2. Open it in any modern browser — no server needed
+3. Add transactions immediately; data saves to `localStorage` automatically
 
-v3 fixes all known security vulnerabilities from v1/v2:
+### Optional: GitHub Gist Sync
 
-| Fix | What changed |
-|-----|-------------|
-| **PAT storage** | Token is stored in `sessionStorage` only — it is automatically wiped when the browser tab is closed. It never touches `localStorage` or the repo. |
-| **XSS protection** | Every piece of user-supplied data (merchant names, dates, categories) is HTML-escaped via `esc()` before being inserted into the DOM. Malicious merchant names like `<script>` are rendered as plain text, not executed. |
-| **Input validation** | All transaction fields are validated on add and on import — type, length, range, and category are all checked. Invalid records are rejected with a count shown to the user. |
-| **Import safety** | Import shows a preview modal before replacing data, and automatically downloads a timestamped backup of current data before overwriting. |
-| **Sync deadlock fix** | `isSyncing` is now always reset correctly, including when the conflict modal is shown. Push/Pull buttons can never get stuck disabled. |
-| **Conflict detection** | Conflict detection now uses a content fingerprint (sorted hash of all transactions) instead of just comparing counts. Identical data across devices no longer triggers a false conflict. |
-| **Consistent formatting** | All amounts use a single `fmt()` function throughout — no more rounded totals in summaries vs. decimal amounts in tables. |
-| **Tooltip callbacks** | Chart options are built fresh per-render via `makeBaseOpts()` — the old `JSON.parse/JSON.stringify` clone silently stripped tooltip formatting functions. |
-| **PAT expiry guidance** | Setup instructions now explicitly warn against "No expiration" tokens. 30–90 day expiry is recommended. |
-| **Delete UX** | Deletes now use a modal instead of `confirm()`, which is suppressible in some browsers. |
-| **Content Security Policy** | A `Content-Security-Policy` meta header restricts which origins can load scripts, styles, and make network requests. |
-
----
-
-## How Data is Stored
-
-| Layer | What | Privacy |
-|-------|------|---------|
-| `localStorage` | Transactions, Gist ID | On your device only |
-| `sessionStorage` | GitHub PAT | Cleared when tab closes |
-| GitHub Gist | JSON backup of all transactions | Private Gist — only you |
-| GitHub Pages | The HTML file (code only, no data) | Public URL, no personal data |
-
-Your expense data never lives in the GitHub repository. The repo only contains the HTML file. Data lives in your private Gist only.
-
----
-
-## Hosting
-
-Hosted on GitHub Pages at:
-
-```
-https://adrajput07.github.io/expense-tracker
-```
-
-The repository is public (required for free GitHub Pages) but contains zero personal data — only the app code.
-
----
-
-## Sync Setup (one-time per device)
-
-1. Go to `github.com` → Settings → Developer Settings → Personal Access Tokens → Tokens (classic)
-2. Generate a new token — name it `expense-tracker`, tick only the **gist** scope
-3. ⚠️ **Set an expiration of 30–90 days** — never use "No expiration"
-4. Copy the `ghp_...` token and keep it somewhere safe
-5. Open the app → click **⚙ Sync Settings** → paste the token → Save
-6. Click **☁ Push to GitHub** — Gist is created automatically, Gist ID auto-saves
-7. On any other device: same URL → **⚙ Sync Settings** → paste same PAT + Gist ID → Pull
-
-> The PAT is kept in `sessionStorage` and cleared when you close the tab. You'll need to re-enter it each session. This is intentional — it means the token is never persistently exposed in browser storage.
-
----
-
-## Daily Usage
-
-- Open the app on any device — it auto-pulls latest data on load (if PAT is set for the session)
-- Add transactions normally — auto-syncs to Gist 3 seconds after each change
-- No manual action needed after daily setup
-
----
-
-## Import / Export
-
-**Export:** Clicking **⬇ Export JSON** downloads a JSON file of all transactions to your device.
-
-**Import:** Clicking **⬆ Import JSON** opens a file picker. After selecting a file, v3 will:
-1. Validate every record in the file (invalid rows are skipped and counted)
-2. Show a preview of the first 10 transactions
-3. **Automatically download a backup** of your current data before replacing
-4. Only replace data after you confirm in the modal
-
----
-
-## Migrating from v1 / v2
-
-Your transaction data stored in `localStorage` under the key `expense_tracker_v1` is **not automatically migrated**. To keep your data:
-
-1. Open your existing v1/v2 app
-2. Click **⬇ Export JSON** to download a backup
-3. Open the v3 app
-4. Click **⬆ Import JSON** and select the backup file
-5. Confirm in the preview modal
-
-v3 stores data under the key `expense_tracker_v3_data` and the Gist ID under `expense_tracker_v3_gist_id`, so v1/v2 and v3 can coexist in the same browser without interfering.
-
----
-
-## Adding to Phone Home Screen
-
-**Android (Chrome):** 3-dot menu → Add to Home Screen
-
-**iPhone (Safari):** Share button → Add to Home Screen
-
-Opens fullscreen like a native app.
-
----
-
-## Files in This Repo
-
-```
-index.html   — the entire application (HTML + CSS + JS, self-contained)
-README.md    — this file
-```
+1. Go to [GitHub → Settings → Developer Settings → Personal Access Tokens → Tokens (classic)](https://github.com/settings/tokens/new)
+2. Create a token with only the **gist** scope; set an expiration (30–90 days recommended)
+3. Click **⚙ Sync Settings** in the app, paste the token, and save
+4. Click **☁ Push to GitHub** — a private Gist is created and the ID is stored locally
+5. On other devices, enter the same token + Gist ID to sync
 
 ---
 
 ## Changelog
 
-### v3 (current)
-- 🔒 PAT moved to `sessionStorage` (never persists beyond tab close)
-- 🔒 Full XSS protection via `esc()` on all dynamic HTML
-- 🔒 Import validation — every field type/range/category checked
-- 🐛 Fixed `isSyncing` deadlock after conflict modal
-- 🐛 Fixed false-positive conflict detection (now uses content fingerprint)
-- 🐛 Fixed chart tooltip functions being silently stripped by `JSON.clone`
-- 🐛 Fixed inconsistent amount formatting across views
-- ✨ Delete confirmation now uses a modal instead of `confirm()`
-- ✨ Import now shows preview + auto-downloads backup before replacing
-- ✨ Weekly tab now has delete buttons (consistent with All Transactions)
-- ✨ PAT show/hide toggle in settings
-- ✨ Clear Token button to wipe credentials on demand
-- ✨ Enter key submits add form
-- ✨ Content Security Policy header added
+### v4 — Security hardening & reliability (current)
 
-### v2
-- AES-256 PAT encryption with passphrase (superseded by sessionStorage approach in v3)
-- XSS escaping added in weekly/daily/all views (incomplete — v3 completes this)
+**Security fixes:**
 
-### v1
-- Initial release
+| # | Issue | Fix |
+|---|-------|-----|
+| S1 | Chart.js loaded from CDN with no integrity check | Inlined Chart.js 4.4.1 directly from the npm package — no CDN request at all |
+| S2 | CSP `<meta>` tag missing `object-src`, `form-action`, `base-uri` | Added all three; `cdnjs.cloudflare.com` removed from allowlist since CDN is no longer used |
+| S3 | Gist ID stored in `localStorage` permanently with no rotation mechanism | Added **🔄 Rotate Gist ID** button — creates a fresh private Gist and orphans the old ID |
+
+**Bug fixes:**
+
+| # | Issue | Fix |
+|---|-------|-----|
+| B1 | Auto-sync race condition: tab closed within 3s window → data never pushed | `beforeunload` listener cancels the debounce timer and fires `fetch(..., { keepalive: true })`, which browsers complete even after page unload |
+| B2 | GitHub API rate limit (5,000 req/hour) hit silently with no user feedback | `gistRequest()` inspects `X-RateLimit-Remaining` and `X-RateLimit-Reset` headers; 403/429 with zero remaining surfaces a human-readable toast with the reset time |
+
+**Note on CDN inlining:** The browser's SRI check compares the hash of the exact bytes served by the CDN. The cdnjs-hosted minified build differs from the npm package build, making a correct pre-computed hash impractical to maintain. Inlining eliminates the entire CDN supply-chain risk — no external script request means no opportunity for CDN compromise or URL hijacking.
+
+---
+
+### v3 — XSS protection, PAT security, smarter conflict detection
+
+**Security fixes:**
+
+| # | Issue | Fix |
+|---|-------|-----|
+| S1 | PAT stored in `localStorage` — persists after tab close | Moved PAT to `sessionStorage` (key `expense_tracker_v3_pat`) — auto-cleared when the tab closes |
+| S2 | All dynamic content injected via `innerHTML` without escaping | Universal `esc()` function applied to every dynamic value inserted into the DOM |
+| S3 | No Content Security Policy | Added `<meta http-equiv="Content-Security-Policy">` tag |
+
+**Bug fixes:**
+
+| # | Issue | Fix |
+|---|-------|-----|
+| B1 | Conflict detection compared only transaction counts — delete-one/add-one went undetected | Replaced count comparison with a content fingerprint: each transaction serialised as `date\|merchant\|amount\|cat`, array sorted and joined, then compared as a string |
+| B2 | `isSyncing` flag not reset on conflict → push/pull buttons deadlocked | Flag reset explicitly before the conflict modal opens |
+| B3 | Import used `window.confirm()` with no undo | Replaced with a preview modal showing the first 10 records; pre-import data auto-exported as a timestamped backup file |
+| B4 | No amount validation — NaN/0/negative/Infinity could corrupt Chart.js | `addTransaction()` validates `amount > 0`, `amount <= 9999999`, `!isNaN(amount)`; same rules applied in `validateTransaction()` for remote and imported data |
+| B5 | Stale index bug: delete button captured index at render time; list could shift before confirm | Delete opens a modal with the captured index; re-validates index is still in-bounds before splicing |
+
+---
+
+### v2 — GitHub Gist sync, multi-tab support
+
+- GitHub Gist push/pull via Personal Access Token
+- Auto-sync (3-second debounce after add/delete)
+- Basic conflict detection (count-based — later improved in v3)
+- Sync status indicator (dot + label in header)
+- `<meta>` CSP tag added
+- JSON export and import (direct replace, no preview)
+- PAT stored in `localStorage` (later fixed in v3)
+
+---
+
+### v1 — Initial release
+
+- Core transaction entry: merchant, amount, date, category
+- `localStorage` persistence
+- Monthly, Weekly, Daily, Categories, All Transactions tabs
+- Chart.js charts: monthly bar, trend line, daily bar, category doughnut
+- Top 10 merchants bar list
+- JSON export
+- No sync, no input validation, no XSS protection
+
+---
+
+## Security Model
+
+| Concern | Mitigation |
+|---------|-----------|
+| XSS via merchant/category names | All dynamic DOM insertions pass through `esc()` (HTML entity encoding) |
+| PAT exposure in storage | PAT lives in `sessionStorage` only — cleared automatically on tab/browser close |
+| PAT exposure via script injection | Chart.js inlined; no external scripts loaded at runtime |
+| Gist ID exposure (long-lived) | **🔄 Rotate Gist ID** creates a new Gist and abandons the old ID |
+| Malicious import file | Every record validated through `validateTransaction()` before any data is touched; invalid records counted and skipped |
+| CDN supply-chain attack | Eliminated — Chart.js bundled directly, no CDN requests |
+| GitHub API abuse / rate limits | 5,000 req/hour limit detected via response headers; user notified with reset time |
+| Tab-close data loss | `beforeunload` + `fetch keepalive` flushes any pending sync before unload |
+| Plugin/object injection | CSP `object-src 'none'` |
+| `<base>` tag hijacking | CSP `base-uri 'self'` |
+| Form action redirection | CSP `form-action 'none'` |
+
+**Remaining known limitation:** The `<meta>` CSP cannot enforce HTTP-header-level restrictions (e.g. it cannot block navigation-level attacks). A proper deployment on a server with `Content-Security-Policy` HTTP headers would be stronger. On GitHub Pages, HTTP headers are not configurable.
+
+---
+
+## Data Format
+
+Transactions are stored in `localStorage` under the key `expense_tracker_v4_data` as a JSON array:
+
+```json
+[
+  {
+    "merchant": "Swiggy",
+    "amount": 349.00,
+    "date": "2026-03-15",
+    "cat": "Food"
+  }
+]
+```
+
+When pushed to Gist, the file `expense_tracker_data.json` wraps the array in a metadata envelope:
+
+```json
+{
+  "transactions": [...],
+  "meta": {
+    "pushedAt": "2026-03-15T17:30:00.000Z",
+    "count": 42,
+    "version": "v4"
+  }
+}
+```
+
+Valid categories: `Food`, `Recharge`, `Shopping`, `Entertainment`, `Transport`, `Health`, `Transfer`, `Other`
+
+---
+
+## Browser Support
+
+Any modern browser (Chrome 89+, Firefox 90+, Safari 15+, Edge 89+). Requires `localStorage`, `sessionStorage`, `fetch`, and `keepalive` fetch support for the tab-close sync guard.
