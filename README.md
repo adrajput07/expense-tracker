@@ -49,7 +49,7 @@ Your expense data never lives in the GitHub repository. The repo only contains t
 
 Hosted on GitHub Pages at:
 ```
-https://adrajpt07.github.io/expense-tracker
+https://adrajput07.github.io/expense-tracker
 ```
 
 Repository is public (required for free GitHub Pages) but contains zero personal data — only the app code.
