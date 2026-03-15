@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Expense Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0f;
+  --surface:#13131a;
+  --input:#1c1c28;
+  --border:#2a2a3a;
+  --lime:#c8f04a;
+  --pink:#f04a8f;
+  --teal:#4af0d0;
+  --amber:#f0a84a;
+  --text:#e8e8f0;
+  --muted:#6b6b88;
+  --font-head:'Syne',sans-serif;
+  --font-body:'DM Mono',monospace;
+}
+html{scrollbar-width:thin;scrollbar-color:#2a2a3a var(--bg)}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:2px}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:var(--font-body);font-size:14px;
+  min-height:100vh;overflow-x:hidden;
+  position:relative;
+}
+/* noise overlay */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity:.4;z-index:0;
+}
+/* glow blobs */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 600px 400px at 90% -10%, rgba(200,240,74,.07) 0%, transparent 70%),
+    radial-gradient(ellipse 500px 400px at -10% 110%, rgba(240,74,143,.07) 0%, transparent 70%);
+}
+.wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+
+/* HEADER */
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 0 24px;flex-wrap:wrap;gap:12px}
+.logo{font-family:var(--font-head);font-weight:800;font-size:22px;letter-spacing:-.5px}
+.logo span{color:var(--lime)}
+.saved-indicator{font-size:11px;color:var(--muted);font-family:var(--font-body)}
+.saved-indicator b{color:var(--teal)}
+
+/* ADD FORM */
+.add-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:20px}
+.add-card h3{font-family:var(--font-head);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:14px}
+.form-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:5px;flex:1;min-width:130px}
+.field label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+.field input,.field select{
+  background:var(--input);border:1px solid var(--border);border-radius:8px;
+  color:var(--text);font-family:var(--font-body);font-size:13px;
+  padding:9px 12px;outline:none;transition:border-color .2s;
+}
+.field input:focus,.field select:focus{border-color:var(--lime)}
+.field select option{background:#1c1c28}
+.btn-add{
+  background:var(--lime);color:#0a0a0f;
+  font-family:var(--font-head);font-weight:700;font-size:13px;
+  border:none;border-radius:8px;padding:9px 20px;cursor:pointer;
+  white-space:nowrap;transition:opacity .15s,transform .1s;
+  align-self:flex-end;
+}
+.btn-add:hover{opacity:.88}
+.btn-add:active{transform:scale(.97)}
+
+/* EXPORT/IMPORT ROW */
+.actions-row{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.btn-action{
+  background:var(--surface);border:1px solid var(--border);
+  color:var(--text);font-family:var(--font-body);font-size:12px;
+  border-radius:8px;padding:8px 16px;cursor:pointer;transition:border-color .2s,color .2s;
+}
+.btn-action:hover{border-color:var(--teal);color:var(--teal)}
+
+/* TABS */
+.tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
+.tab-btn{
+  background:var(--surface);border:1px solid var(--border);
+  color:var(--muted);font-family:var(--font-head);font-weight:600;font-size:12px;
+  letter-spacing:.5px;border-radius:50px;padding:7px 18px;cursor:pointer;
+  transition:all .18s;
+}
+.tab-btn.active{background:var(--lime);border-color:var(--lime);color:#0a0a0f}
+.tab-btn:not(.active):hover{border-color:var(--text);color:var(--text)}
+
+/* TAB PANELS */
+.tab-panel{display:none;animation:fadeUp .25s ease}
+.tab-panel.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* METRIC CARDS */
+.metrics-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+.metric-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+.metric-card .label{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin-bottom:6px}
+.metric-card .value{font-family:var(--font-head);font-size:26px;font-weight:800;line-height:1}
+.metric-card .sub{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* CHARTS */
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:14px}
+.chart-card h4{font-family:var(--font-head);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin-bottom:16px}
+.chart-wrap{position:relative;height:220px}
+.chart-wrap.tall{height:260px}
+
+/* SECTION TITLE */
+.section-title{font-family:var(--font-head);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin:20px 0 12px}
+
+/* TABLES */
+.tx-table{width:100%;border-collapse:collapse}
+.tx-table th{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);text-align:left;padding:6px 10px;border-bottom:1px solid var(--border)}
+.tx-table td{padding:9px 10px;border-bottom:1px solid rgba(42,42,58,.5);font-size:13px}
+.tx-table tr:hover td{background:rgba(255,255,255,.02)}
+.tx-amount{font-family:var(--font-head);font-weight:700;color:var(--lime);text-align:right}
+.tx-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px;transition:color .15s,background .15s}
+.tx-del:hover{color:var(--pink);background:rgba(240,74,143,.1)}
+.badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:50px;background:var(--input);color:var(--muted)}
+
+/* FILTER ROW */
+.filter-row{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filter-row select{background:var(--input);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font-body);font-size:12px;padding:7px 12px;outline:none}
+.filter-row .count-info{font-size:12px;color:var(--muted);margin-left:auto}
+.filter-row .count-info b{color:var(--text)}
+
+/* CATEGORY / MERCHANT BARS */
+.bar-list{display:flex;flex-direction:column;gap:10px}
+.bar-item{}
+.bar-item .bar-meta{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px}
+.bar-item .bar-meta .name{color:var(--text);font-family:var(--font-head);font-weight:600}
+.bar-item .bar-meta .amt{color:var(--lime);font-family:var(--font-head);font-weight:700}
+.bar-track{height:5px;background:var(--input);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+
+/* DONUT LEGEND */
+.donut-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:center}
+.donut-legend{display:flex;flex-direction:column;gap:8px}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:12px}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.legend-name{color:var(--text);flex:1}
+.legend-pct{color:var(--muted)}
+
+/* TOAST */
+#toast{
+  position:fixed;bottom:24px;right:24px;z-index:9999;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:12px 18px;font-size:13px;
+  transform:translateY(80px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  pointer-events:none;max-width:280px;
+}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.ok{border-color:var(--lime);color:var(--lime)}
+#toast.err{border-color:var(--pink);color:var(--pink)}
+
+/* WEEK TABLE */
+.week-block{margin-bottom:14px}
+.week-block .wk-header{display:flex;justify-content:space-between;font-size:11px;font-family:var(--font-head);font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);padding:6px 0;border-bottom:1px solid var(--border);margin-bottom:6px}
+.wk-header .wk-total{color:var(--amber)}
+
+/* empty state */
+.empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px}
+.empty b{color:var(--text);font-family:var(--font-head);font-size:16px;display:block;margin-bottom:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- HEADER -->
+  <header>
+    <div class="logo">expense<span>.</span>io</div>
+    <div class="saved-indicator">Last saved: <b id="saved-time">—</b></div>
+  </header>
+
+  <!-- ADD FORM -->
+  <div class="add-card">
+    <h3>Add Transaction</h3>
+    <div class="form-row">
+      <div class="field">
+        <label>Merchant / Person</label>
+        <input type="text" id="f-merchant" placeholder="e.g. Swiggy, Ajay..."/>
+      </div>
+      <div class="field" style="max-width:140px">
+        <label>Amount (₹)</label>
+        <input type="number" id="f-amount" placeholder="0" min="0" step="any"/>
+      </div>
+      <div class="field" style="max-width:150px">
+        <label>Date</label>
+        <input type="date" id="f-date"/>
+      </div>
+      <div class="field" style="max-width:160px">
+        <label>Category</label>
+        <select id="f-cat">
+          <option>Food</option>
+          <option>Recharge</option>
+          <option>Shopping</option>
+          <option>Entertainment</option>
+          <option>Transport</option>
+          <option>Health</option>
+          <option>Transfer</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <button class="btn-add" onclick="addTransaction()">+ Add</button>
+    </div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="actions-row">
+    <button class="btn-action" onclick="exportJSON()">⬇ Export JSON</button>
+    <button class="btn-action" onclick="triggerImport()">⬆ Import Backup</button>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importJSON(event)"/>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('monthly',this)">Monthly</button>
+    <button class="tab-btn" onclick="showTab('weekly',this)">Weekly</button>
+    <button class="tab-btn" onclick="showTab('daily',this)">Daily</button>
+    <button class="tab-btn" onclick="showTab('categories',this)">Categories</button>
+    <button class="tab-btn" onclick="showTab('all',this)">All Transactions</button>
+  </div>
+
+  <!-- MONTHLY TAB -->
+  <div id="tab-monthly" class="tab-panel active">
+    <div class="metrics-row" id="monthly-metrics"></div>
+    <div class="chart-card">
+      <h4>Monthly Spending</h4>
+      <div class="chart-wrap"><canvas id="chart-monthly-bar"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h4>Spending Trend</h4>
+      <div class="chart-wrap"><canvas id="chart-monthly-trend"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h4>Month Breakdown</h4>
+      <div id="monthly-hbars" class="bar-list"></div>
+    </div>
+  </div>
+
+  <!-- WEEKLY TAB -->
+  <div id="tab-weekly" class="tab-panel">
+    <div class="metrics-row" id="weekly-metrics"></div>
+    <div class="chart-card">
+      <h4>Last 12 Weeks</h4>
+      <div class="chart-wrap"><canvas id="chart-weekly-bar"></canvas></div>
+    </div>
+    <div class="section-title">Week-by-Week Detail</div>
+    <div id="weekly-detail"></div>
+  </div>
+
+  <!-- DAILY TAB -->
+  <div id="tab-daily" class="tab-panel">
+    <div class="filter-row">
+      <select id="daily-month-sel" onchange="renderDaily()"></select>
+    </div>
+    <div class="chart-card">
+      <h4>Daily Spending</h4>
+      <div class="chart-wrap tall"><canvas id="chart-daily"></canvas></div>
+    </div>
+    <div id="daily-table"></div>
+  </div>
+
+  <!-- CATEGORIES TAB -->
+  <div id="tab-categories" class="tab-panel">
+    <div class="chart-card">
+      <h4>Spending by Category</h4>
+      <div class="donut-grid">
+        <div class="chart-wrap" style="height:200px"><canvas id="chart-donut"></canvas></div>
+        <div id="donut-legend" class="donut-legend"></div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h4>Top 10 Merchants</h4>
+      <div id="merchant-bars" class="bar-list"></div>
+    </div>
+    <div class="chart-card">
+      <h4>Category Breakdown</h4>
+      <div id="cat-bars" class="bar-list"></div>
+    </div>
+  </div>
+
+  <!-- ALL TRANSACTIONS TAB -->
+  <div id="tab-all" class="tab-panel">
+    <div class="filter-row">
+      <select id="all-month-sel"></select>
+      <select id="all-cat-sel">
+        <option value="">All Categories</option>
+        <option>Food</option><option>Recharge</option><option>Shopping</option>
+        <option>Entertainment</option><option>Transport</option><option>Health</option>
+        <option>Transfer</option><option>Other</option>
+      </select>
+      <span class="count-info" id="all-count"></span>
+    </div>
+    <div id="all-table"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+const STORAGE_KEY = 'expense_tracker_v1';
+let transactions = [];
+const CATS = ['Food','Recharge','Shopping','Entertainment','Transport','Health','Transfer','Other'];
+const CAT_COLORS = {
+  Food:'#c8f04a', Recharge:'#4af0d0', Shopping:'#f04a8f',
+  Entertainment:'#f0a84a', Transport:'#a84af0', Health:'#4a8ff0',
+  Transfer:'#f04a4a', Other:'#888'
+};
+
+// ─── STORAGE ───────────────────────────────────────────────────────────────
+function loadFromStorage(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    transactions = raw ? JSON.parse(raw) : [];
+  }catch(e){ transactions = []; }
+}
+function saveToStorage(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+  const now = new Date();
+  document.getElementById('saved-time').textContent =
+    now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+// ─── DATE HELPERS ──────────────────────────────────────────────────────────
+function parseDate(s){ return new Date(s+'T00:00:00'); }
+function ymd(d){ return d.toISOString().slice(0,10); }
+function monthKey(s){ return s.slice(0,7); }
+function monthLabel(key){
+  const d = parseDate(key+'-01');
+  return d.toLocaleString('en-IN',{month:'short',year:'numeric'});
+}
+function weekKey(d){
+  const dt = new Date(d); dt.setHours(0,0,0,0);
+  const day = dt.getDay();
+  const mon = new Date(dt); mon.setDate(dt.getDate() - (day===0?6:day-1));
+  return ymd(mon);
+}
+function weekLabel(key){
+  const start = parseDate(key);
+  const end = new Date(start); end.setDate(start.getDate()+6);
+  return start.toLocaleDateString('en-IN',{day:'numeric',month:'short'})+' – '+
+         end.toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+}
+
+// ─── FORMAT ────────────────────────────────────────────────────────────────
+function fmt(n){ return '₹'+Math.round(n).toLocaleString('en-IN'); }
+function fmtD(n){ return '₹'+(Number.isInteger(n)?Math.round(n):n.toFixed(2)).toLocaleString('en-IN'); }
+
+// ─── TOAST ─────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg, type='ok'){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'show '+(type==='err'?'err':'ok');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ el.className=''; },2800);
+}
+
+// ─── CHART REGISTRY ───────────────────────────────────────────────────────
+const charts = {};
+function destroyChart(id){
+  if(charts[id]){ charts[id].destroy(); delete charts[id]; }
+}
+function makeChart(id, cfg){
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if(!ctx) return;
+  charts[id] = new Chart(ctx, cfg);
+  return charts[id];
+}
+
+const BASE_CHART_OPTS = {
+  responsive:true, maintainAspectRatio:false,
+  plugins:{legend:{display:false},tooltip:{
+    backgroundColor:'#13131a',borderColor:'#2a2a3a',borderWidth:1,
+    titleColor:'#e8e8f0',bodyColor:'#c8f04a',
+    titleFont:{family:"'Syne',sans-serif",weight:'700'},
+    bodyFont:{family:"'DM Mono',monospace"},
+    callbacks:{label:ctx=>' '+fmt(ctx.raw)}
+  }},
+  scales:{
+    x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#6b6b88',font:{family:"'DM Mono',monospace",size:11}}},
+    y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#6b6b88',font:{family:"'DM Mono',monospace",size:11},callback:v=>fmt(v)}}
+  }
+};
+
+// ─── ADD ───────────────────────────────────────────────────────────────────
+function addTransaction(){
+  const merchant = document.getElementById('f-merchant').value.trim();
+  const amount   = parseFloat(document.getElementById('f-amount').value);
+  const date     = document.getElementById('f-date').value;
+  const cat      = document.getElementById('f-cat').value;
+  if(!merchant){ toast('Enter a merchant name','err'); return; }
+  if(!amount||amount<=0){ toast('Enter a valid amount','err'); return; }
+  if(!date){ toast('Pick a date','err'); return; }
+  transactions.push({merchant, amount, date, cat});
+  transactions.sort((a,b)=>b.date.localeCompare(a.date));
+  saveToStorage();
+  fullRefresh();
+  document.getElementById('f-merchant').value='';
+  document.getElementById('f-amount').value='';
+  toast('Added: '+merchant+' '+fmt(amount));
+}
+
+// ─── DELETE ────────────────────────────────────────────────────────────────
+function deleteTransaction(idx){
+  const t = transactions[idx];
+  if(!confirm('Delete: '+t.merchant+' '+fmtD(t.amount)+'?')) return;
+  transactions.splice(idx,1);
+  saveToStorage();
+  fullRefresh();
+  toast('Deleted','err');
+}
+
+// ─── EXPORT ────────────────────────────────────────────────────────────────
+function exportJSON(){
+  const blob = new Blob([JSON.stringify(transactions,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'expenses_'+ymd(new Date())+'.json';
+  a.click();
+  toast('Exported '+transactions.length+' transactions');
+}
+function triggerImport(){ document.getElementById('import-file').click(); }
+function importJSON(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try{
+      const data = JSON.parse(ev.target.result);
+      if(!Array.isArray(data)) throw new Error('Bad format');
+      if(!confirm('Replace all data with '+data.length+' imported transactions?')) return;
+      transactions = data;
+      saveToStorage(); fullRefresh();
+      toast('Imported '+data.length+' transactions');
+    }catch(err){ toast('Invalid backup file','err'); }
+    e.target.value='';
+  };
+  reader.readAsText(file);
+}
+
+// ─── TABS ──────────────────────────────────────────────────────────────────
+let activeTab = 'monthly';
+function showTab(name, btn){
+  activeTab = name;
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ─── MONTH OPTIONS ─────────────────────────────────────────────────────────
+function getAllMonths(){
+  const set = new Set(transactions.map(t=>monthKey(t.date)));
+  const now = ymd(new Date()).slice(0,7);
+  set.add(now);
+  return Array.from(set).sort((a,b)=>b.localeCompare(a));
+}
+function populateMonthSelect(id, includeAll=false){
+  const sel = document.getElementById(id);
+  const prev = sel.value;
+  sel.innerHTML='';
+  if(includeAll){
+    const opt = document.createElement('option'); opt.value=''; opt.textContent='All Time';
+    sel.appendChild(opt);
+  }
+  getAllMonths().forEach(m=>{
+    const opt = document.createElement('option');
+    opt.value=m; opt.textContent=monthLabel(m); sel.appendChild(opt);
+  });
+  if(prev && Array.from(sel.options).some(o=>o.value===prev)) sel.value=prev;
+}
+
+// ─── FULL REFRESH ──────────────────────────────────────────────────────────
+function fullRefresh(){
+  const prevDaily  = document.getElementById('daily-month-sel').value;
+  const prevAllMon = document.getElementById('all-month-sel').value;
+  const prevAllCat = document.getElementById('all-cat-sel').value;
+
+  populateMonthSelect('daily-month-sel');
+  populateMonthSelect('all-month-sel', true);
+
+  if(prevDaily  && Array.from(document.getElementById('daily-month-sel').options).some(o=>o.value===prevDaily))
+    document.getElementById('daily-month-sel').value = prevDaily;
+  if(prevAllMon && Array.from(document.getElementById('all-month-sel').options).some(o=>o.value===prevAllMon))
+    document.getElementById('all-month-sel').value = prevAllMon;
+  document.getElementById('all-cat-sel').value = prevAllCat;
+
+  renderMonthly();
+  renderWeekly();
+  renderDaily();
+  renderCategories();
+  renderAll();
+}
+
+// ─── MONTHLY ───────────────────────────────────────────────────────────────
+function renderMonthly(){
+  const now = new Date();
+  const thisMonth = ymd(now).slice(0,7);
+  const lastMonth = (()=>{ const d=new Date(now); d.setDate(1); d.setMonth(d.getMonth()-1); return ymd(d).slice(0,7); })();
+
+  const grand = transactions.reduce((s,t)=>s+t.amount,0);
+  const thisM = transactions.filter(t=>monthKey(t.date)===thisMonth).reduce((s,t)=>s+t.amount,0);
+  const lastM = transactions.filter(t=>monthKey(t.date)===lastMonth).reduce((s,t)=>s+t.amount,0);
+
+  // monthly map
+  const byMonth = {};
+  transactions.forEach(t=>{ const k=monthKey(t.date); byMonth[k]=(byMonth[k]||0)+t.amount; });
+  const months = Object.keys(byMonth).sort();
+  const avg = months.length ? Object.values(byMonth).reduce((s,v)=>s+v,0)/months.length : 0;
+
+  document.getElementById('monthly-metrics').innerHTML = `
+    <div class="metric-card"><div class="label">Grand Total</div><div class="value" style="color:var(--lime)">${fmt(grand)}</div><div class="sub">${transactions.length} transactions</div></div>
+    <div class="metric-card"><div class="label">This Month</div><div class="value" style="color:var(--teal)">${fmt(thisM)}</div><div class="sub">${monthLabel(thisMonth)}</div></div>
+    <div class="metric-card"><div class="label">Last Month</div><div class="value" style="color:var(--amber)">${fmt(lastM)}</div><div class="sub">${monthLabel(lastMonth)}</div></div>
+    <div class="metric-card"><div class="label">Monthly Avg</div><div class="value" style="color:var(--pink)">${fmt(avg)}</div><div class="sub">across ${months.length} months</div></div>
+  `;
+
+  const labels = months.map(monthLabel);
+  const vals   = months.map(m=>byMonth[m]);
+
+  makeChart('chart-monthly-bar',{
+    type:'bar',
+    data:{labels,datasets:[{data:vals,backgroundColor:'rgba(200,240,74,.75)',borderColor:'#c8f04a',borderWidth:1,borderRadius:4}]},
+    options:{...JSON.parse(JSON.stringify(BASE_CHART_OPTS)),responsive:true,maintainAspectRatio:false}
+  });
+
+  makeChart('chart-monthly-trend',{
+    type:'line',
+    data:{labels,datasets:[{data:vals,borderColor:'#f04a8f',backgroundColor:'rgba(240,74,143,.12)',borderWidth:2,pointRadius:4,pointBackgroundColor:'#f04a8f',tension:.35,fill:true}]},
+    options:{...JSON.parse(JSON.stringify(BASE_CHART_OPTS)),responsive:true,maintainAspectRatio:false}
+  });
+
+  // horizontal bars
+  const maxV = Math.max(...vals,1);
+  const hbarsEl = document.getElementById('monthly-hbars');
+  if(!vals.length){ hbarsEl.innerHTML='<div class="empty"><b>No data</b>Add some transactions</div>'; return; }
+  hbarsEl.innerHTML = months.map((m,i)=>`
+    <div class="bar-item">
+      <div class="bar-meta"><span class="name">${monthLabel(m)}</span><span class="amt">${fmt(vals[i])}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(vals[i]/maxV*100).toFixed(1)}%;background:var(--lime)"></div></div>
+    </div>
+  `).reverse().join('');
+}
+
+// ─── WEEKLY ────────────────────────────────────────────────────────────────
+function renderWeekly(){
+  const byWeek = {};
+  transactions.forEach(t=>{ const k=weekKey(t.date); byWeek[k]=(byWeek[k]||0)+t.amount; });
+  const weeks = Object.keys(byWeek).sort();
+  const last12 = weeks.slice(-12);
+  const vals   = last12.map(w=>byWeek[w]);
+  const thisWk = weekKey(ymd(new Date()));
+  const thisW  = byWeek[thisWk]||0;
+  const avg    = weeks.length ? Object.values(byWeek).reduce((s,v)=>s+v,0)/weeks.length : 0;
+  const peak   = weeks.length ? Math.max(...Object.values(byWeek)) : 0;
+
+  document.getElementById('weekly-metrics').innerHTML = `
+    <div class="metric-card"><div class="label">This Week</div><div class="value" style="color:var(--lime)">${fmt(thisW)}</div><div class="sub">${weekLabel(thisWk)}</div></div>
+    <div class="metric-card"><div class="label">Weekly Avg</div><div class="value" style="color:var(--teal)">${fmt(avg)}</div><div class="sub">across ${weeks.length} weeks</div></div>
+    <div class="metric-card"><div class="label">Peak Week</div><div class="value" style="color:var(--pink)">${fmt(peak)}</div></div>
+  `;
+
+  makeChart('chart-weekly-bar',{
+    type:'bar',
+    data:{labels:last12.map(weekLabel),datasets:[{data:vals,backgroundColor:'rgba(74,240,208,.7)',borderColor:'#4af0d0',borderWidth:1,borderRadius:4}]},
+    options:{...JSON.parse(JSON.stringify(BASE_CHART_OPTS)),responsive:true,maintainAspectRatio:false}
+  });
+
+  // week-by-week detail
+  const detailEl = document.getElementById('weekly-detail');
+  if(!weeks.length){ detailEl.innerHTML='<div class="empty"><b>No data</b></div>'; return; }
+
+  // group transactions by week
+  const txByWeek = {};
+  const indexed = transactions.map((t,i)=>({...t,_idx:i}));
+  indexed.forEach(t=>{
+    const k=weekKey(t.date);
+    if(!txByWeek[k]) txByWeek[k]=[];
+    txByWeek[k].push(t);
+  });
+
+  detailEl.innerHTML = [...weeks].reverse().map(wk=>{
+    const txs = txByWeek[wk]||[];
+    const total = txs.reduce((s,t)=>s+t.amount,0);
+    const rows = txs.map(t=>`
+      <tr>
+        <td>${t.date}</td>
+        <td>${t.merchant}</td>
+        <td><span class="badge">${t.cat}</span></td>
+        <td class="tx-amount">${fmtD(t.amount)}</td>
+      </tr>`).join('');
+    return `<div class="week-block chart-card" style="padding:14px">
+      <div class="wk-header"><span>${weekLabel(wk)}</span><span class="wk-total">${fmt(total)}</span></div>
+      <table class="tx-table"><tbody>${rows}</tbody></table>
+    </div>`;
+  }).join('');
+}
+
+// ─── DAILY ─────────────────────────────────────────────────────────────────
+function renderDaily(){
+  const sel = document.getElementById('daily-month-sel');
+  const month = sel.value || (getAllMonths()[0]||ymd(new Date()).slice(0,7));
+
+  const filtered = transactions.filter(t=>monthKey(t.date)===month);
+  const byDay = {};
+  filtered.forEach(t=>{ byDay[t.date]=(byDay[t.date]||0)+t.amount; });
+  const days = Object.keys(byDay).sort();
+
+  makeChart('chart-daily',{
+    type:'bar',
+    data:{
+      labels:days.map(d=>parseDate(d).toLocaleDateString('en-IN',{day:'numeric',month:'short'})),
+      datasets:[{data:days.map(d=>byDay[d]),backgroundColor:'rgba(240,168,74,.75)',borderColor:'#f0a84a',borderWidth:1,borderRadius:4}]
+    },
+    options:{...JSON.parse(JSON.stringify(BASE_CHART_OPTS)),responsive:true,maintainAspectRatio:false}
+  });
+
+  const tableEl = document.getElementById('daily-table');
+  if(!filtered.length){ tableEl.innerHTML='<div class="empty"><b>No transactions</b>for this month</div>'; return; }
+  const indexed = transactions.map((t,i)=>({...t,_idx:i}));
+  const rows = indexed.filter(t=>monthKey(t.date)===month).map(t=>`
+    <tr>
+      <td>${t.date}</td>
+      <td>${t.merchant}</td>
+      <td><span class="badge">${t.cat}</span></td>
+      <td class="tx-amount">${fmtD(t.amount)}</td>
+    </tr>`).join('');
+  tableEl.innerHTML = `<table class="tx-table">
+    <thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+// ─── CATEGORIES ────────────────────────────────────────────────────────────
+function renderCategories(){
+  const byCat = {};
+  CATS.forEach(c=>byCat[c]=0);
+  transactions.forEach(t=>{ byCat[t.cat]=(byCat[t.cat]||0)+t.amount; });
+  const total = Object.values(byCat).reduce((s,v)=>s+v,0);
+
+  const catsWithData = CATS.filter(c=>byCat[c]>0);
+  const donutLabels = catsWithData;
+  const donutData   = catsWithData.map(c=>byCat[c]);
+  const donutColors = catsWithData.map(c=>CAT_COLORS[c]);
+
+  makeChart('chart-donut',{
+    type:'doughnut',
+    data:{labels:donutLabels,datasets:[{data:donutData,backgroundColor:donutColors,borderWidth:2,borderColor:'#13131a',hoverOffset:6}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,cutout:'65%',
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#13131a',borderColor:'#2a2a3a',borderWidth:1,
+          titleColor:'#e8e8f0',bodyColor:'#c8f04a',
+          callbacks:{label:ctx=>` ${ctx.label}: ${fmt(ctx.raw)}`}
+        }
+      }
+    }
+  });
+
+  document.getElementById('donut-legend').innerHTML = catsWithData.length
+    ? catsWithData.map(c=>`
+        <div class="legend-item">
+          <div class="legend-dot" style="background:${CAT_COLORS[c]}"></div>
+          <span class="legend-name">${c}</span>
+          <span class="legend-pct">${total?((byCat[c]/total)*100).toFixed(1)+'%':'—'}</span>
+        </div>`).join('')
+    : '<div class="empty"><b>No data</b></div>';
+
+  // merchants
+  const byMerchant = {};
+  transactions.forEach(t=>{ byMerchant[t.merchant]=(byMerchant[t.merchant]||0)+t.amount; });
+  const topM = Object.entries(byMerchant).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const maxM = topM[0]?topM[0][1]:1;
+  document.getElementById('merchant-bars').innerHTML = topM.length
+    ? topM.map(([name,amt])=>`
+        <div class="bar-item">
+          <div class="bar-meta"><span class="name">${name}</span><span class="amt">${fmt(amt)}</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${(amt/maxM*100).toFixed(1)}%;background:var(--teal)"></div></div>
+        </div>`).join('')
+    : '<div class="empty"><b>No data</b></div>';
+
+  // category breakdown
+  const maxC = Math.max(...CATS.map(c=>byCat[c]),1);
+  document.getElementById('cat-bars').innerHTML = CATS.map(c=>`
+    <div class="bar-item">
+      <div class="bar-meta"><span class="name">${c}</span><span class="amt">${fmt(byCat[c])}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(byCat[c]/maxC*100).toFixed(1)}%;background:${CAT_COLORS[c]}"></div></div>
+    </div>`).join('');
+}
+
+// ─── ALL TRANSACTIONS ──────────────────────────────────────────────────────
+function renderAll(){
+  const month = document.getElementById('all-month-sel').value;
+  const cat   = document.getElementById('all-cat-sel').value;
+
+  const indexed = transactions.map((t,i)=>({...t,_idx:i}));
+  const filtered = indexed.filter(t=>{
+    if(month && monthKey(t.date)!==month) return false;
+    if(cat   && t.cat!==cat)              return false;
+    return true;
+  });
+
+  const total = filtered.reduce((s,t)=>s+t.amount,0);
+  document.getElementById('all-count').innerHTML =
+    `<b>${filtered.length}</b> transactions · <b>${fmt(total)}</b>`;
+
+  const tableEl = document.getElementById('all-table');
+  if(!filtered.length){ tableEl.innerHTML='<div class="empty"><b>No transactions</b>Try different filters</div>'; return; }
+  const rows = filtered.map(t=>`
+    <tr>
+      <td>${t.date}</td>
+      <td>${t.merchant}</td>
+      <td><span class="badge">${t.cat}</span></td>
+      <td class="tx-amount">${fmtD(t.amount)}</td>
+      <td><button class="tx-del" onclick="deleteTransaction(${t._idx})">✕</button></td>
+    </tr>`).join('');
+  tableEl.innerHTML = `<table class="tx-table">
+    <thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th><th></th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+// ─── INIT ──────────────────────────────────────────────────────────────────
+document.getElementById('f-date').value = ymd(new Date());
+
+loadFromStorage();
+populateMonthSelect('daily-month-sel');
+populateMonthSelect('all-month-sel', true);
+fullRefresh();
+</script>
+</body>
+</html>
