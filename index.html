@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; font-src https://fonts.gstatic.com; connect-src https://api.github.com; img-src 'self' data:; object-src 'none'; base-uri 'self';">
 <title>Expense Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
@@ -190,16 +191,22 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
         <input type="password" id="s-pat" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off"/>
       </div>
       <div class="field">
+        <label>Passphrase <span style="font-size:10px;color:var(--muted)">(encrypts your token — required)</span></label>
+        <input type="password" id="s-passphrase" placeholder="Choose a strong passphrase" autocomplete="new-password"/>
+      </div>
+      <div class="field" style="grid-column:1/-1">
         <label>Gist ID <span style="font-size:10px;color:var(--muted)">(auto-filled after first push)</span></label>
         <input type="text" id="s-gist" placeholder="Leave blank — will be created automatically"/>
       </div>
     </div>
     <div class="settings-note">
       <b>One-time setup:</b><br>
-      1. Go to <a href="https://github.com/settings/tokens/new" target="_blank">github.com → Settings → Developer Settings → Personal Access Tokens → Tokens (classic)</a><br>
-      2. Give it a name like <b>expense-tracker</b>, tick only the <b>gist</b> scope, click Generate<br>
-      3. Copy &amp; paste the token above → Save Settings → click <b>☁ Push to GitHub</b><br>
-      4. The Gist ID auto-saves. On your other devices, enter the same token + copy the Gist ID from here.
+      1. Go to <a href="https://github.com/settings/tokens/new" target="_blank">GitHub → Settings → Developer Settings → Tokens (classic)</a><br>
+      2. Give it a name like <b>expense-tracker</b>, tick only the <b>gist</b> scope<br>
+      3. ⚠ Set an <b>expiration (30 or 90 days)</b> — never choose "No expiration"<br>
+      4. Paste the token + a passphrase above → Save → click <b>☁ Push to GitHub</b><br>
+      5. Your token is <b>AES-256 encrypted</b> before storage — raw PAT is never saved to disk<br>
+      6. On other devices: enter same token + passphrase + copy the Gist ID shown here
     </div>
     <div class="settings-actions">
       <button class="btn-action" onclick="saveSettings()">💾 Save Settings</button>
@@ -334,6 +341,42 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 <div id="toast"></div>
 
 <script>
+// ── XSS SANITIZER ─────────────────────────────────────────────────────────────
+function esc(str){
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#x27;');
+}
+
+// ── WEB CRYPTO — PAT ENCRYPTION ───────────────────────────────────────────────
+// Encrypts PAT with AES-GCM using a PBKDF2-derived key from a user passphrase.
+// Raw PAT is NEVER stored in localStorage.
+async function deriveKey(passphrase, salt){
+  const enc = new TextEncoder();
+  const base = await crypto.subtle.importKey('raw',enc.encode(passphrase),{name:'PBKDF2'},false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:200000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function encryptPAT(token, passphrase){
+  const enc = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const key  = await deriveKey(passphrase, salt);
+  const cipher = await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(token));
+  const b64 = x => btoa(String.fromCharCode(...new Uint8Array(x)));
+  return `${b64(salt)}.${b64(iv)}.${b64(cipher)}`;
+}
+async function decryptPAT(blob, passphrase){
+  const dec = new TextDecoder();
+  const [saltB64,ivB64,cB64] = blob.split('.');
+  const b64a = s => Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+  const key  = await deriveKey(passphrase, b64a(saltB64));
+  const plain = await crypto.subtle.decrypt({name:'AES-GCM',iv:b64a(ivB64)},key,b64a(cB64));
+  return dec.decode(plain);
+}
+
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const STORAGE_KEY   = 'expense_tracker_v1';
 const SETTINGS_KEY  = 'expense_tracker_settings';
@@ -346,7 +389,8 @@ const CAT_COLORS = {
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let transactions = [];
-let syncSettings  = {pat:'', gistId:''};
+let syncSettings  = {encryptedPat:'', gistId:''}; // PAT is NEVER stored raw
+let patInMemory   = '';  // decrypted PAT lives only in memory for this session
 let conflictRemoteData = null;
 let autoSyncTimer = null;
 let isSyncing = false;
@@ -354,7 +398,16 @@ let isSyncing = false;
 // ── STORAGE ───────────────────────────────────────────────────────────────────
 function loadFromStorage(){
   try{ transactions = JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); }catch(e){ transactions=[]; }
-  try{ const s=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'); syncSettings={pat:s.pat||'',gistId:s.gistId||''}; }catch(e){}
+  try{
+    const s=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}');
+    // migrate old plain-text PAT: clear it and ask user to re-enter
+    if(s.pat && !s.encryptedPat){
+      s.encryptedPat=''; delete s.pat;
+      localStorage.setItem(SETTINGS_KEY,JSON.stringify(s));
+      toast('Security upgrade: please re-enter your PAT in ⚙ Sync Settings','info');
+    }
+    syncSettings={encryptedPat:s.encryptedPat||'',gistId:s.gistId||''};
+  }catch(e){}
 }
 function saveToStorage(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
@@ -399,7 +452,7 @@ function setSyncStatus(state,label){
 function updateSyncUI(){
   const pushBtn=document.getElementById('btn-push');
   const pullBtn=document.getElementById('btn-pull');
-  if(!syncSettings.pat){
+  if(!patInMemory){
     setSyncStatus('','Not configured');
     pushBtn.disabled=true; pullBtn.disabled=true;
   } else if(!syncSettings.gistId){
@@ -416,24 +469,40 @@ function toggleSettings(){
   const p=document.getElementById('settings-panel');
   p.classList.toggle('open');
   if(p.classList.contains('open')){
-    document.getElementById('s-pat').value=syncSettings.pat;
+    // Never pre-fill the PAT field — user must re-enter it
+    document.getElementById('s-pat').value='';
+    document.getElementById('s-passphrase').value='';
     document.getElementById('s-gist').value=syncSettings.gistId;
   }
 }
-function saveSettings(){
-  syncSettings.pat=document.getElementById('s-pat').value.trim();
-  syncSettings.gistId=document.getElementById('s-gist').value.trim();
-  saveSyncSettings(); updateSyncUI();
-  document.getElementById('settings-panel').classList.remove('open');
-  toast('Sync settings saved','info');
+async function saveSettings(){
+  const pat=document.getElementById('s-pat').value.trim();
+  const passphrase=document.getElementById('s-passphrase').value;
+  const gistId=document.getElementById('s-gist').value.trim();
+
+  if(!pat){ toast('Enter your GitHub PAT','err'); return; }
+  if(passphrase.length < 8){ toast('Passphrase must be at least 8 characters','err'); return; }
+
+  try{
+    const encrypted = await encryptPAT(pat, passphrase);
+    syncSettings.encryptedPat = encrypted;
+    syncSettings.gistId = gistId;
+    patInMemory = pat; // store raw PAT in memory only for this session
+    saveSyncSettings(); updateSyncUI();
+    document.getElementById('settings-panel').classList.remove('open');
+    toast('Settings saved — PAT encrypted with AES-256','info');
+  } catch(e){
+    toast('Encryption failed: '+e.message,'err');
+  }
 }
 
 // ── GITHUB GIST API ───────────────────────────────────────────────────────────
 async function gistRequest(method,endpoint,body){
+  if(!patInMemory) throw new Error('Token not loaded — re-enter PAT in ⚙ Sync Settings');
   const res=await fetch('https://api.github.com'+endpoint,{
     method,
     headers:{
-      'Authorization':'token '+syncSettings.pat,
+      'Authorization':'token '+patInMemory,
       'Accept':'application/vnd.github.v3+json',
       'Content-Type':'application/json'
     },
@@ -444,7 +513,7 @@ async function gistRequest(method,endpoint,body){
 }
 
 async function pushToGist(){
-  if(!syncSettings.pat){ toast('Add your GitHub token in ⚙ Sync Settings','err'); return; }
+  if(!patInMemory){ toast('Enter your PAT in ⚙ Sync Settings','err'); return; }
   if(isSyncing) return;
   isSyncing=true;
   setSyncStatus('syncing','Pushing…');
@@ -481,7 +550,7 @@ async function pushToGist(){
 }
 
 async function pullFromGist(silent=false){
-  if(!syncSettings.pat||!syncSettings.gistId){ if(!silent) toast('Configure sync settings first','err'); return; }
+  if(!patInMemory||!syncSettings.gistId){ if(!silent) toast('Configure sync settings first','err'); return; }
   if(isSyncing) return;
   isSyncing=true;
   setSyncStatus('syncing','Pulling…');
@@ -544,7 +613,7 @@ function resolveConflict(action){
 
 // ── AUTO-SYNC (debounced, 3s after last change) ───────────────────────────────
 function scheduleAutoSync(){
-  if(!syncSettings.pat||!syncSettings.gistId) return;
+  if(!patInMemory||!syncSettings.gistId) return;
   clearTimeout(autoSyncTimer);
   setSyncStatus('syncing','Saving…');
   autoSyncTimer=setTimeout(()=>{ pushToGist(); },3000);
@@ -709,7 +778,7 @@ function renderWeekly(){
   dEl.innerHTML=[...weeks].reverse().map(wk=>{
     const txs=txByWeek[wk]||[];
     const total=txs.reduce((s,t)=>s+t.amount,0);
-    return`<div class="week-block chart-card" style="padding:14px"><div class="wk-header"><span>${weekLabel(wk)}</span><span class="wk-total">${fmt(total)}</span></div><table class="tx-table"><tbody>${txs.map(t=>`<tr><td>${t.date}</td><td>${t.merchant}</td><td><span class="badge">${t.cat}</span></td><td class="tx-amount">${fmtD(t.amount)}</td></tr>`).join('')}</tbody></table></div>`;
+    return`<div class="week-block chart-card" style="padding:14px"><div class="wk-header"><span>${weekLabel(wk)}</span><span class="wk-total">${fmt(total)}</span></div><table class="tx-table"><tbody>${txs.map(t=>`<tr><td>${esc(t.date)}</td><td>${esc(t.merchant)}</td><td><span class="badge">${esc(t.cat)}</span></td><td class="tx-amount">${fmtD(t.amount)}</td></tr>`).join('')}</tbody></table></div>`;
   }).join('');
 }
 
@@ -724,7 +793,7 @@ function renderDaily(){
   makeChart('chart-daily',{type:'bar',data:{labels:days.map(d=>parseDate(d).toLocaleDateString('en-IN',{day:'numeric',month:'short'})),datasets:[{data:days.map(d=>byDay[d]),backgroundColor:'rgba(240,168,74,.75)',borderColor:'#f0a84a',borderWidth:1,borderRadius:4}]},options:cloneOpts()});
   const tEl=document.getElementById('daily-table');
   if(!filtered.length){tEl.innerHTML='<div class="empty"><b>No transactions</b>for this month</div>';return;}
-  const rows=transactions.map((t,i)=>({...t,_idx:i})).filter(t=>monthKey(t.date)===month).map(t=>`<tr><td>${t.date}</td><td>${t.merchant}</td><td><span class="badge">${t.cat}</span></td><td class="tx-amount">${fmtD(t.amount)}</td></tr>`).join('');
+  const rows=transactions.map((t,i)=>({...t,_idx:i})).filter(t=>monthKey(t.date)===month).map(t=>`<tr><td>${esc(t.date)}</td><td>${esc(t.merchant)}</td><td><span class="badge">${esc(t.cat)}</span></td><td class="tx-amount">${fmtD(t.amount)}</td></tr>`).join('');
   tEl.innerHTML=`<table class="tx-table"><thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -740,7 +809,7 @@ function renderCategories(){
   transactions.forEach(t=>{ byM[t.merchant]=(byM[t.merchant]||0)+t.amount; });
   const topM=Object.entries(byM).sort((a,b)=>b[1]-a[1]).slice(0,10);
   const maxM=topM[0]?topM[0][1]:1;
-  document.getElementById('merchant-bars').innerHTML=topM.length?topM.map(([n,a])=>`<div class="bar-item"><div class="bar-meta"><span class="name">${n}</span><span class="amt">${fmt(a)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${(a/maxM*100).toFixed(1)}%;background:var(--teal)"></div></div></div>`).join(''):'<div class="empty"><b>No data</b></div>';
+  document.getElementById('merchant-bars').innerHTML=topM.length?topM.map(([n,a])=>`<div class="bar-item"><div class="bar-meta"><span class="name">${esc(n)}</span><span class="amt">${fmt(a)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${(a/maxM*100).toFixed(1)}%;background:var(--teal)"></div></div></div>`).join(''):'<div class="empty"><b>No data</b></div>';
   const maxC=Math.max(...CATS.map(c=>byCat[c]),1);
   document.getElementById('cat-bars').innerHTML=CATS.map(c=>`<div class="bar-item"><div class="bar-meta"><span class="name">${c}</span><span class="amt">${fmt(byCat[c])}</span></div><div class="bar-track"><div class="bar-fill" style="width:${(byCat[c]/maxC*100).toFixed(1)}%;background:${CAT_COLORS[c]}"></div></div></div>`).join('');
 }
@@ -759,7 +828,7 @@ function renderAll(){
   document.getElementById('all-count').innerHTML=`<b>${filtered.length}</b> transactions · <b>${fmt(total)}</b>`;
   const tEl=document.getElementById('all-table');
   if(!filtered.length){tEl.innerHTML='<div class="empty"><b>No transactions</b>Try different filters</div>';return;}
-  tEl.innerHTML=`<table class="tx-table"><thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th><th></th></tr></thead><tbody>${filtered.map(t=>`<tr><td>${t.date}</td><td>${t.merchant}</td><td><span class="badge">${t.cat}</span></td><td class="tx-amount">${fmtD(t.amount)}</td><td><button class="tx-del" onclick="deleteTransaction(${t._idx})">✕</button></td></tr>`).join('')}</tbody></table>`;
+  tEl.innerHTML=`<table class="tx-table"><thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th><th></th></tr></thead><tbody>${filtered.map(t=>`<tr><td>${esc(t.date)}</td><td>${esc(t.merchant)}</td><td><span class="badge">${esc(t.cat)}</span></td><td class="tx-amount">${fmtD(t.amount)}</td><td><button class="tx-del" onclick="deleteTransaction(${Number(t._idx)})">✕</button></td></tr>`).join('')}</tbody></table>`;
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
@@ -770,9 +839,20 @@ populateMonthSelect('all-month-sel',true);
 fullRefresh();
 updateSyncUI();
 
-// Auto-pull on page load if Gist is configured
-if(syncSettings.pat && syncSettings.gistId){
-  pullFromGist(true); // silent=true: no toast if already up to date
+// If encrypted PAT exists in storage, prompt for passphrase to load into memory
+if(syncSettings.encryptedPat){
+  (async()=>{
+    const passphrase=prompt('Enter your sync passphrase to activate GitHub sync:');
+    if(!passphrase) return;
+    try{
+      patInMemory=await decryptPAT(syncSettings.encryptedPat,passphrase);
+      updateSyncUI();
+      // Auto-pull on page load if Gist is configured
+      if(syncSettings.gistId) pullFromGist(true);
+    } catch(e){
+      toast('Wrong passphrase — sync disabled for this session','err');
+    }
+  })();
 }
 </script>
 </body>
