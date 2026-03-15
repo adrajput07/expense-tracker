@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; font-src https://fonts.gstatic.com; connect-src https://api.github.com; img-src 'self' data:; object-src 'none'; base-uri 'self';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.github.com; img-src 'self' data:; object-src 'none'; base-uri 'self';">
 <title>Expense Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
@@ -191,22 +191,22 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
         <input type="password" id="s-pat" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off"/>
       </div>
       <div class="field">
-        <label>Passphrase <span style="font-size:10px;color:var(--muted)">(encrypts your token — required)</span></label>
-        <input type="password" id="s-passphrase" placeholder="Choose a strong passphrase" autocomplete="new-password"/>
+        <label>Passphrase <span style="font-size:10px;color:var(--muted)">(encrypts token in storage)</span></label>
+        <input type="password" id="s-passphrase" placeholder="Min 8 chars" autocomplete="new-password"/>
       </div>
-      <div class="field" style="grid-column:1/-1">
+      <div class="field">
         <label>Gist ID <span style="font-size:10px;color:var(--muted)">(auto-filled after first push)</span></label>
         <input type="text" id="s-gist" placeholder="Leave blank — will be created automatically"/>
       </div>
     </div>
     <div class="settings-note">
       <b>One-time setup:</b><br>
-      1. Go to <a href="https://github.com/settings/tokens/new" target="_blank">GitHub → Settings → Developer Settings → Tokens (classic)</a><br>
+      1. Go to <a href="https://github.com/settings/tokens/new" target="_blank">github.com → Settings → Developer Settings → Personal Access Tokens → Tokens (classic)</a><br>
       2. Give it a name like <b>expense-tracker</b>, tick only the <b>gist</b> scope<br>
-      3. ⚠ Set an <b>expiration (30 or 90 days)</b> — never choose "No expiration"<br>
-      4. Paste the token + a passphrase above → Save → click <b>☁ Push to GitHub</b><br>
-      5. Your token is <b>AES-256 encrypted</b> before storage — raw PAT is never saved to disk<br>
-      6. On other devices: enter same token + passphrase + copy the Gist ID shown here
+      3. ⚠ Set an <b>expiration (30 or 90 days)</b> — avoid "No expiration"<br>
+      4. Paste the token + a passphrase above → Save Settings → click <b>☁ Push to GitHub</b><br>
+      5. Your PAT is <b>AES-256 encrypted</b> before being stored — the raw token is never saved to disk<br>
+      6. On your other devices, enter the same token + passphrase + copy the Gist ID from here
     </div>
     <div class="settings-actions">
       <button class="btn-action" onclick="saveSettings()">💾 Save Settings</button>
@@ -344,36 +344,31 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 // ── XSS SANITIZER ─────────────────────────────────────────────────────────────
 function esc(str){
   return String(str)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;')
-    .replace(/'/g,'&#x27;');
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
 }
 
 // ── WEB CRYPTO — PAT ENCRYPTION ───────────────────────────────────────────────
-// Encrypts PAT with AES-GCM using a PBKDF2-derived key from a user passphrase.
-// Raw PAT is NEVER stored in localStorage.
-async function deriveKey(passphrase, salt){
-  const enc = new TextEncoder();
-  const base = await crypto.subtle.importKey('raw',enc.encode(passphrase),{name:'PBKDF2'},false,['deriveKey']);
+async function deriveKey(passphrase,salt){
+  const enc=new TextEncoder();
+  const base=await crypto.subtle.importKey('raw',enc.encode(passphrase),{name:'PBKDF2'},false,['deriveKey']);
   return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:200000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
 }
-async function encryptPAT(token, passphrase){
-  const enc = new TextEncoder();
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const iv   = crypto.getRandomValues(new Uint8Array(12));
-  const key  = await deriveKey(passphrase, salt);
-  const cipher = await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(token));
-  const b64 = x => btoa(String.fromCharCode(...new Uint8Array(x)));
+async function encryptPAT(token,passphrase){
+  const enc=new TextEncoder();
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const key=await deriveKey(passphrase,salt);
+  const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(token));
+  const b64=x=>btoa(String.fromCharCode(...new Uint8Array(x)));
   return `${b64(salt)}.${b64(iv)}.${b64(cipher)}`;
 }
-async function decryptPAT(blob, passphrase){
-  const dec = new TextDecoder();
-  const [saltB64,ivB64,cB64] = blob.split('.');
-  const b64a = s => Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-  const key  = await deriveKey(passphrase, b64a(saltB64));
-  const plain = await crypto.subtle.decrypt({name:'AES-GCM',iv:b64a(ivB64)},key,b64a(cB64));
+async function decryptPAT(blob,passphrase){
+  const dec=new TextDecoder();
+  const[saltB64,ivB64,cB64]=blob.split('.');
+  const b64a=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+  const key=await deriveKey(passphrase,b64a(saltB64));
+  const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64a(ivB64)},key,b64a(cB64));
   return dec.decode(plain);
 }
 
@@ -389,8 +384,8 @@ const CAT_COLORS = {
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let transactions = [];
-let syncSettings  = {encryptedPat:'', gistId:''}; // PAT is NEVER stored raw
-let patInMemory   = '';  // decrypted PAT lives only in memory for this session
+let syncSettings  = {pat:'', gistId:''};
+let patInMemory   = ''; // holds decrypted PAT for the session only
 let conflictRemoteData = null;
 let autoSyncTimer = null;
 let isSyncing = false;
@@ -400,13 +395,12 @@ function loadFromStorage(){
   try{ transactions = JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); }catch(e){ transactions=[]; }
   try{
     const s=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}');
-    // migrate old plain-text PAT: clear it and ask user to re-enter
-    if(s.pat && !s.encryptedPat){
-      s.encryptedPat=''; delete s.pat;
-      localStorage.setItem(SETTINGS_KEY,JSON.stringify(s));
-      toast('Security upgrade: please re-enter your PAT in ⚙ Sync Settings','info');
-    }
-    syncSettings={encryptedPat:s.encryptedPat||'',gistId:s.gistId||''};
+    // Migrate: if old plain-text PAT exists, keep it temporarily so sync still works
+    // but flag that user should re-save with a passphrase
+    syncSettings={pat:s.pat||'',encryptedPat:s.encryptedPat||'',gistId:s.gistId||''};
+    // If we have an encryptedPat, don't use the raw one
+    if(syncSettings.encryptedPat) syncSettings.pat='';
+    patInMemory = syncSettings.pat; // backwards compat: if plain pat exists, use it for now
   }catch(e){}
 }
 function saveToStorage(){
@@ -469,8 +463,7 @@ function toggleSettings(){
   const p=document.getElementById('settings-panel');
   p.classList.toggle('open');
   if(p.classList.contains('open')){
-    // Never pre-fill the PAT field — user must re-enter it
-    document.getElementById('s-pat').value='';
+    document.getElementById('s-pat').value=''; // never pre-fill PAT
     document.getElementById('s-passphrase').value='';
     document.getElementById('s-gist').value=syncSettings.gistId;
   }
@@ -479,26 +472,24 @@ async function saveSettings(){
   const pat=document.getElementById('s-pat').value.trim();
   const passphrase=document.getElementById('s-passphrase').value;
   const gistId=document.getElementById('s-gist').value.trim();
-
   if(!pat){ toast('Enter your GitHub PAT','err'); return; }
-  if(passphrase.length < 8){ toast('Passphrase must be at least 8 characters','err'); return; }
-
+  if(passphrase.length<8){ toast('Passphrase must be at least 8 characters','err'); return; }
   try{
-    const encrypted = await encryptPAT(pat, passphrase);
-    syncSettings.encryptedPat = encrypted;
-    syncSettings.gistId = gistId;
-    patInMemory = pat; // store raw PAT in memory only for this session
+    const encrypted=await encryptPAT(pat,passphrase);
+    syncSettings.encryptedPat=encrypted;
+    syncSettings.pat=''; // never store raw
+    syncSettings.gistId=gistId;
+    patInMemory=pat;
     saveSyncSettings(); updateSyncUI();
     document.getElementById('settings-panel').classList.remove('open');
     toast('Settings saved — PAT encrypted with AES-256','info');
-  } catch(e){
-    toast('Encryption failed: '+e.message,'err');
+  }catch(e){
+    toast('Encryption error: '+e.message,'err');
   }
 }
 
 // ── GITHUB GIST API ───────────────────────────────────────────────────────────
 async function gistRequest(method,endpoint,body){
-  if(!patInMemory) throw new Error('Token not loaded — re-enter PAT in ⚙ Sync Settings');
   const res=await fetch('https://api.github.com'+endpoint,{
     method,
     headers:{
@@ -513,7 +504,7 @@ async function gistRequest(method,endpoint,body){
 }
 
 async function pushToGist(){
-  if(!patInMemory){ toast('Enter your PAT in ⚙ Sync Settings','err'); return; }
+  if(!patInMemory){ toast('Add your GitHub token in ⚙ Sync Settings','err'); return; }
   if(isSyncing) return;
   isSyncing=true;
   setSyncStatus('syncing','Pushing…');
@@ -839,20 +830,34 @@ populateMonthSelect('all-month-sel',true);
 fullRefresh();
 updateSyncUI();
 
-// If encrypted PAT exists in storage, prompt for passphrase to load into memory
-if(syncSettings.encryptedPat){
-  (async()=>{
-    const passphrase=prompt('Enter your sync passphrase to activate GitHub sync:');
-    if(!passphrase) return;
-    try{
-      patInMemory=await decryptPAT(syncSettings.encryptedPat,passphrase);
-      updateSyncUI();
-      // Auto-pull on page load if Gist is configured
-      if(syncSettings.gistId) pullFromGist(true);
-    } catch(e){
-      toast('Wrong passphrase — sync disabled for this session','err');
-    }
-  })();
+// If encrypted PAT exists and no plain-text fallback: show inline unlock prompt
+if(syncSettings.encryptedPat && !patInMemory){
+  // Inject a small unlock banner just below the header
+  const banner=document.createElement('div');
+  banner.id='unlock-banner';
+  banner.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
+  banner.innerHTML=`<span style="font-size:12px;color:var(--muted);flex:1">🔒 Enter your sync passphrase to activate GitHub sync</span><input type="password" id="unlock-pass" placeholder="Passphrase…" style="background:var(--input);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font-body);font-size:13px;padding:8px 12px;outline:none;width:200px" /><button class="btn-action btn-sync" onclick="unlockPAT()" style="white-space:nowrap">Unlock Sync</button>`;
+  document.querySelector('.wrap').insertBefore(banner, document.getElementById('settings-panel').nextSibling);
+  document.getElementById('unlock-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') unlockPAT(); });
+} else if(patInMemory && syncSettings.gistId){
+  // Plain-text PAT still in storage (old format) — auto-pull works as before
+  pullFromGist(true);
+}
+
+async function unlockPAT(){
+  const pass=document.getElementById('unlock-pass').value;
+  if(!pass) return;
+  try{
+    patInMemory=await decryptPAT(syncSettings.encryptedPat,pass);
+    document.getElementById('unlock-banner')?.remove();
+    updateSyncUI();
+    toast('Sync unlocked','info');
+    if(syncSettings.gistId) pullFromGist(true);
+  }catch(e){
+    toast('Wrong passphrase — try again','err');
+    document.getElementById('unlock-pass').value='';
+    document.getElementById('unlock-pass').focus();
+  }
 }
 </script>
 </body>
